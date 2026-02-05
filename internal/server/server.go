@@ -2,10 +2,14 @@ package server
 
 import (
 	"database/sql"
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/codepnw/go-starter-kit/internal/config"
+	producthandler "github.com/codepnw/go-starter-kit/internal/features/product/handler"
+	productrepository "github.com/codepnw/go-starter-kit/internal/features/product/repository"
+	productservice "github.com/codepnw/go-starter-kit/internal/features/product/service"
 	userhandler "github.com/codepnw/go-starter-kit/internal/features/user/handler"
 	userrepository "github.com/codepnw/go-starter-kit/internal/features/user/repository"
 	userservice "github.com/codepnw/go-starter-kit/internal/features/user/service"
@@ -60,10 +64,10 @@ func NewServer(cfg *config.EnvConfig, db *sql.DB) (*Server, error) {
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
-	
+
 	// Prefix Default: /api/v1
 	prefix := s.router.Group(cfg.APP.Prefix)
-	
+
 	// Register Routes
 	s.registerHealthRoutes(prefix)
 	s.registerUserRoutes(prefix)
@@ -101,5 +105,29 @@ func (s *Server) registerUserRoutes(r *gin.RouterGroup) {
 	users := r.Group("/users", s.mid.Authorized())
 	{
 		users.GET("/profile", handler.GetProfile)
+	}
+}
+
+func (s *Server) registerProductRoutes(r *gin.RouterGroup) {
+	repo := productrepository.NewProductRepository(s.db)
+	service := productservice.NewProductService(repo)
+	handler := producthandler.NewProductHandler(service)
+
+	productIDPath := fmt.Sprintf("/:%s", producthandler.ParamProductID)
+	
+	// Public Routes
+	public := r.Group("/products")
+	{
+		public.GET("/", handler.GetProducts)
+		public.GET(productIDPath, handler.GetProduct)
+
+	}
+	
+	// Authorized Routes
+	authorized := r.Group("/products", s.mid.Authorized())
+	{
+		authorized.POST("/", handler.CreateProduct)
+		authorized.PATCH(productIDPath, handler.UpdateProduct)
+		authorized.DELETE(productIDPath, handler.DeleteProduct)
 	}
 }
