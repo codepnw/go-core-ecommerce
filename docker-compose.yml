@@ -1,0 +1,36 @@
+services:
+  app:
+    container_name: starter-kit-app   # config container_name
+    env_file: .env
+    build: .
+    ports:
+      - "8080:8080"
+    environment:                      # Override .env keys
+      - DB_HOST=db                    # .env -> db services
+      - DB_PORT=5432                  # .env -> postgres port
+    depends_on:                       
+      db: 
+        condition: service_healthy    # wait db
+  
+  db:
+    image: postgres:16-alpine         # config image
+    container_name: starter-kit-db    # config container_name
+    env_file: .env
+    healthcheck:                      # check db is ready
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"] 
+      interval: 5s  
+      timeout: 5s
+      retries: 5
+    environment:
+      - POSTGRES_USER=${DB_USER}          # .env DB_USER
+      - POSTGRES_PASSWORD=${DB_PASSWORD}  # .env DB_PASSWORD
+      - POSTGRES_DB=${DB_NAME}            # .env DB_NAME
+    ports:
+      - "${DB_PORT}:5432"                 # .env DB_PORT
+    volumes:
+      - pg_data:/var/lib/postgresql/data  # PostgreSQL 17 and below
+
+      
+volumes:
+  pg_data:
+  

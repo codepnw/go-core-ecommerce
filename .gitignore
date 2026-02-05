@@ -1,0 +1,13 @@
+# Created by https://www.toptal.com/developers/gitignore/api/go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+# End of https://www.toptal.com/developers/gitignore/api/go
+
+.env
+*.txt
