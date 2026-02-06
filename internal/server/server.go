@@ -71,6 +71,7 @@ func NewServer(cfg *config.EnvConfig, db *sql.DB) (*Server, error) {
 	// Register Routes
 	s.registerHealthRoutes(prefix)
 	s.registerUserRoutes(prefix)
+	s.registerProductRoutes(prefix)
 
 	return s, nil
 }
@@ -114,20 +115,21 @@ func (s *Server) registerProductRoutes(r *gin.RouterGroup) {
 	handler := producthandler.NewProductHandler(service)
 
 	productIDPath := fmt.Sprintf("/:%s", producthandler.ParamProductID)
-	
+
 	// Public Routes
 	public := r.Group("/products")
 	{
 		public.GET("/", handler.GetProducts)
 		public.GET(productIDPath, handler.GetProduct)
-
 	}
-	
+
 	// Authorized Routes
-	authorized := r.Group("/products", s.mid.Authorized())
+	// authorized := r.Group("/products", s.mid.Authorized())
+	authorized := r.Group("/products")
 	{
 		authorized.POST("/", handler.CreateProduct)
 		authorized.PATCH(productIDPath, handler.UpdateProduct)
 		authorized.DELETE(productIDPath, handler.DeleteProduct)
+		authorized.POST(productIDPath+"/stock", handler.IncreaseStock)
 	}
 }
