@@ -8,6 +8,7 @@ import (
 	productrepository "github.com/codepnw/go-starter-kit/internal/features/product/repository"
 )
 
+//go:generate mockgen -source=product_service.go -destination=product_service_mock.go -package=productservice
 type ProductService interface {
 	CreateProduct(ctx context.Context, input *product.Product) error
 	GetProduct(ctx context.Context, productID int64) (*product.Product, error)
