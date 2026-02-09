@@ -10,6 +10,7 @@ import (
 	"github.com/codepnw/go-starter-kit/internal/features/product"
 )
 
+//go:generate mockgen -source=product_repository.go -destination=product_repository_mock.go -package=productrepository
 type ProductRepository interface {
 	InsertProduct(ctx context.Context, input *product.Product) error
 	FindProduct(ctx context.Context, productID int64) (*product.Product, error)
@@ -17,7 +18,9 @@ type ProductRepository interface {
 	UpdateProduct(ctx context.Context, input *product.Product) error
 	DeleteProduct(ctx context.Context, productID int64) error
 	IncreaseStock(ctx context.Context, productID int64, qty int) error
-	DecreaseStock(ctx context.Context, productID int64, qty int) error
+	
+	// Transaction
+	DecreaseStockTx(ctx context.Context, tx *sql.Tx, productID int64, qty int) error
 }
 
 type productRepository struct {
@@ -168,12 +171,12 @@ func (r *productRepository) IncreaseStock(ctx context.Context, productID int64, 
 	return nil
 }
 
-func (r *productRepository) DecreaseStock(ctx context.Context, productID int64, qty int) error {
+func (r *productRepository) DecreaseStockTx(ctx context.Context, tx *sql.Tx, productID int64, qty int) error {
 	query := `
 		UPDATE products SET stock = stock - $1, version = version + 1
 		WHERE id = $2 AND stock >= $1
 	`
-	res, err := r.db.ExecContext(ctx, query, qty, productID)
+	res, err := tx.ExecContext(ctx, query, qty, productID)
 	if err != nil {
 		return err
 	}

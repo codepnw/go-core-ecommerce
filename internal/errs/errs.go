@@ -19,3 +19,6 @@ var (
 	ErrProductSKUExists = errors.New("product sku already exists")
 	ErrStockNotEnough   = errors.New("stock not enough")
 )
+
+// Err Orders
+var ErrCartEmpty = errors.New("cart empty")

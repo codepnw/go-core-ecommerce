@@ -10,6 +10,9 @@ import (
 	carthandler "github.com/codepnw/go-starter-kit/internal/features/cart/handler"
 	cartrepository "github.com/codepnw/go-starter-kit/internal/features/cart/repository"
 	cartservice "github.com/codepnw/go-starter-kit/internal/features/cart/service"
+	orderhandler "github.com/codepnw/go-starter-kit/internal/features/order/handler"
+	orderrepository "github.com/codepnw/go-starter-kit/internal/features/order/repository"
+	orderservice "github.com/codepnw/go-starter-kit/internal/features/order/service"
 	producthandler "github.com/codepnw/go-starter-kit/internal/features/product/handler"
 	productrepository "github.com/codepnw/go-starter-kit/internal/features/product/repository"
 	productservice "github.com/codepnw/go-starter-kit/internal/features/product/service"
@@ -76,6 +79,7 @@ func NewServer(cfg *config.EnvConfig, db *sql.DB) (*Server, error) {
 	s.registerUserRoutes(prefix)
 	s.registerProductRoutes(prefix)
 	s.registerCartRoutes(prefix)
+	s.registerOrderRoutes(prefix)
 
 	return s, nil
 }
@@ -150,5 +154,19 @@ func (s *Server) registerCartRoutes(r *gin.RouterGroup) {
 		carts.GET("/", handler.GetCart)
 		carts.POST("/items", handler.AddItem)
 		carts.DELETE(fmt.Sprintf("/items/:%s", producthandler.ParamProductID), handler.RemoveItme)
+	}
+}
+
+func (s *Server) registerOrderRoutes(r *gin.RouterGroup) {
+	prodRepo := productrepository.NewProductRepository(s.db)
+	cartRepo := cartrepository.NewCartRepository(s.db)
+	orderRepo := orderrepository.NewOrderRepository(s.db)
+	
+	service := orderservice.NewOrderService(s.tx, orderRepo, prodRepo, cartRepo)
+	handler := orderhandler.NewOrderHandler(service)
+	
+	orders := r.Group("/orders", s.mid.Authorized())
+	{
+		orders.POST("/checkout", handler.CreateOrder)
 	}
 }

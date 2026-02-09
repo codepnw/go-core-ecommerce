@@ -6,6 +6,7 @@ package cartrepository
 
 import (
 	context "context"
+	sql "database/sql"
 	reflect "reflect"
 
 	cart "github.com/codepnw/go-starter-kit/internal/features/cart"
@@ -47,6 +48,20 @@ func (m *MockCartRepository) AddItem(ctx context.Context, cartID, productID int6
 func (mr *MockCartRepositoryMockRecorder) AddItem(ctx, cartID, productID, quantity interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddItem", reflect.TypeOf((*MockCartRepository)(nil).AddItem), ctx, cartID, productID, quantity)
+}
+
+// ClearCartTx mocks base method.
+func (m *MockCartRepository) ClearCartTx(ctx context.Context, tx *sql.Tx, userID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ClearCartTx", ctx, tx, userID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ClearCartTx indicates an expected call of ClearCartTx.
+func (mr *MockCartRepositoryMockRecorder) ClearCartTx(ctx, tx, userID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClearCartTx", reflect.TypeOf((*MockCartRepository)(nil).ClearCartTx), ctx, tx, userID)
 }
 
 // FindCartID mocks base method.

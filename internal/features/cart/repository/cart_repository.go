@@ -15,6 +15,9 @@ type CartRepository interface {
 	AddItem(ctx context.Context, cartID, productID int64, quantity int) error
 	GetCartItems(ctx context.Context, userID string) ([]*cart.CartItemResult, error)
 	RemoveItem(ctx context.Context, cartID, productID int64) error
+
+	// Transaction
+	ClearCartTx(ctx context.Context, tx *sql.Tx, userID string) error
 }
 
 type cartRepository struct {
@@ -111,17 +114,29 @@ func (r *cartRepository) GetCartItems(ctx context.Context, userID string) ([]*ca
 
 func (r *cartRepository) RemoveItem(ctx context.Context, cartID, productID int64) error {
 	query := `
-		DELETE FROM cart_items 
+		DELETE FROM cart_items
 		WHERE cart_id = $1 AND product_id = $2
 	`
 	res, err := r.db.ExecContext(ctx, query, cartID, productID)
 	if err != nil {
 		return err
 	}
-	
+
 	rows, _ := res.RowsAffected()
 	if rows == 0 {
 		return errs.ErrProductNotFound
+	}
+	return nil
+}
+
+func (r *cartRepository) ClearCartTx(ctx context.Context, tx *sql.Tx, userID string) error {
+	query := `
+		DELETE FROM cart_items
+		WHERE cart_id = (SELECT id FROM carts WHERE user_id = $1)
+	`
+	_, err := tx.ExecContext(ctx, query, userID)
+	if err != nil {
+		return err
 	}
 	return nil
 }
