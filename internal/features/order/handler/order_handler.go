@@ -2,6 +2,7 @@ package orderhandler
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/codepnw/go-starter-kit/internal/auth"
 	"github.com/codepnw/go-starter-kit/internal/errs"
@@ -46,4 +47,21 @@ func (h *orderHandler) CreateOrder(c *gin.Context) {
 		"message":  "order created successfully",
 		"order_no": orderNo,
 	})
+}
+
+func (h *orderHandler) GetOrderDetails(c *gin.Context) {
+	orderID, _ := strconv.ParseInt(c.Param(ParamOrderID), 10, 64)
+
+	resp, err := h.service.GetOrderDetails(c.Request.Context(), orderID)
+	if err != nil {
+		switch err {
+		case errs.ErrOrderNotFound:
+			response.ResponseError(c, http.StatusNotFound, err)
+		default:
+			response.ResponseError(c, http.StatusInternalServerError, err)
+		}
+		return
+	}
+
+	response.ResponseSuccess(c, http.StatusOK, resp)
 }

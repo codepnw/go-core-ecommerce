@@ -17,6 +17,7 @@ import (
 
 type OrderService interface {
 	CreateOrder(ctx context.Context, userID, address string) (string, error)
+	GetOrderDetails(ctx context.Context, orderID int64) (*order.OrderDetailResponse, error)
 }
 
 type orderService struct {
@@ -40,6 +41,40 @@ func NewOrderService(
 	}
 }
 
+// GetOrderDetails implements OrderService.
+func (s *orderService) GetOrderDetails(ctx context.Context, orderID int64) (*order.OrderDetailResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, config.ContextTimeout)
+	defer cancel()
+
+	ordData, err := s.orderRepo.FindOrderDetails(ctx, orderID)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Details Response
+	resp := &order.OrderDetailResponse{
+		OrderNo:   generateOrderNo(ordData.ID, ordData.CreatedAt),
+		OrderDate: ordData.CreatedAt.Format(time.DateTime),
+		Status:    ordData.Status,
+		Address:   ordData.Address,
+		Amount:    int64(ordData.TotalAmount),
+		Items:     make([]order.OrderItemResponse, 0),
+	}
+	
+	// Add Items Response
+	for _, item := range ordData.Items {
+		ordItem := order.OrderItemResponse{
+			ProductName: item.ProductName,
+			Quantity:    item.Quantity,
+			Price:       int64(item.Price),
+			Total:       int64(item.Price) * int64(item.Quantity),
+		}
+		resp.Items = append(resp.Items, ordItem)
+	}
+	return resp, nil
+}
+
+// CreateOrder implements OrderService.
 func (s *orderService) CreateOrder(ctx context.Context, userID, address string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, config.ContextTimeout)
 	defer cancel()
@@ -59,15 +94,17 @@ func (s *orderService) CreateOrder(ctx context.Context, userID, address string) 
 	}
 
 	var orderID int64
+	var orderCreatedAt time.Time
 
 	// Transaction
 	err = s.tx.WithTx(ctx, func(tx *sql.Tx) error {
 		// 2. Create Order
-		id, err := s.orderRepo.InsertOrderTx(ctx, tx, userID, totalAmount, address)
+		id, createdAt, err := s.orderRepo.InsertOrderTx(ctx, tx, userID, totalAmount, address)
 		if err != nil {
 			return fmt.Errorf("insert order failed: %w", err)
 		}
 		orderID = id
+		orderCreatedAt = createdAt
 
 		// 3. Loop Items
 		for _, item := range cartItems {
@@ -99,10 +136,12 @@ func (s *orderService) CreateOrder(ctx context.Context, userID, address string) 
 		return "", err
 	}
 
-	return generateOrderNo(orderID), nil
+	return generateOrderNo(orderID, orderCreatedAt), nil
 }
 
-func generateOrderNo(orderID int64) string {
-	now := time.Now().Format("20060201")
+// -------- HELPER ------------
+
+func generateOrderNo(orderID int64, createdAt time.Time) string {
+	now := createdAt.Format("20060201")
 	return fmt.Sprintf("ORD-%s-%06d", now, orderID)
 }

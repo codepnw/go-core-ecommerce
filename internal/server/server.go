@@ -161,12 +161,15 @@ func (s *Server) registerOrderRoutes(r *gin.RouterGroup) {
 	prodRepo := productrepository.NewProductRepository(s.db)
 	cartRepo := cartrepository.NewCartRepository(s.db)
 	orderRepo := orderrepository.NewOrderRepository(s.db)
-	
+
 	service := orderservice.NewOrderService(s.tx, orderRepo, prodRepo, cartRepo)
 	handler := orderhandler.NewOrderHandler(service)
-	
+
+	orderID := fmt.Sprintf("/:%s", orderhandler.ParamOrderID)
+
 	orders := r.Group("/orders", s.mid.Authorized())
 	{
 		orders.POST("/checkout", handler.CreateOrder)
+		orders.GET(orderID, handler.GetOrderDetails)
 	}
 }

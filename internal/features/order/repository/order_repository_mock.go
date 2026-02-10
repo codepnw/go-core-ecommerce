@@ -8,6 +8,7 @@ import (
 	context "context"
 	sql "database/sql"
 	reflect "reflect"
+	time "time"
 
 	order "github.com/codepnw/go-starter-kit/internal/features/order"
 	gomock "github.com/golang/mock/gomock"
@@ -36,6 +37,21 @@ func (m *MockOrderRepository) EXPECT() *MockOrderRepositoryMockRecorder {
 	return m.recorder
 }
 
+// FindOrderDetails mocks base method.
+func (m *MockOrderRepository) FindOrderDetails(ctx context.Context, orderID int64) (*order.Order, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindOrderDetails", ctx, orderID)
+	ret0, _ := ret[0].(*order.Order)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindOrderDetails indicates an expected call of FindOrderDetails.
+func (mr *MockOrderRepositoryMockRecorder) FindOrderDetails(ctx, orderID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindOrderDetails", reflect.TypeOf((*MockOrderRepository)(nil).FindOrderDetails), ctx, orderID)
+}
+
 // InsertOrderItemTx mocks base method.
 func (m *MockOrderRepository) InsertOrderItemTx(ctx context.Context, tx *sql.Tx, item order.OrderItemReq) error {
 	m.ctrl.T.Helper()
@@ -51,12 +67,13 @@ func (mr *MockOrderRepositoryMockRecorder) InsertOrderItemTx(ctx, tx, item inter
 }
 
 // InsertOrderTx mocks base method.
-func (m *MockOrderRepository) InsertOrderTx(ctx context.Context, tx *sql.Tx, userID string, totalAmount int64, address string) (int64, error) {
+func (m *MockOrderRepository) InsertOrderTx(ctx context.Context, tx *sql.Tx, userID string, totalAmount int64, address string) (int64, time.Time, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "InsertOrderTx", ctx, tx, userID, totalAmount, address)
 	ret0, _ := ret[0].(int64)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret1, _ := ret[1].(time.Time)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // InsertOrderTx indicates an expected call of InsertOrderTx.

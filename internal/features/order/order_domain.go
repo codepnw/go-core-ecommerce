@@ -20,6 +20,9 @@ type Order struct {
 	Address     string      `json:"address" db:"address"`
 	CreatedAt   time.Time   `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time   `json:"updated_at" db:"updated_at"`
+
+	// Field not in orders table
+	Items []OrderItem `db:"-"`
 }
 
 type OrderItem struct {
@@ -28,6 +31,27 @@ type OrderItem struct {
 	ProductID int64 `json:"product_id" db:"product_id"`
 	Quantity  int   `json:"quantity" db:"quantity"`
 	Price     int   `json:"price" db:"price"`
+
+	// Field not in order_items table
+	ProductName string `db:"-"`
+}
+
+// ============ Order DTO =================
+
+type OrderDetailResponse struct {
+	OrderNo   string              `json:"order_no"`
+	OrderDate string              `json:"order_date"`
+	Status    OrderStatus         `json:"status"`
+	Address   string              `json:"address"`
+	Amount    int64               `json:"amount"`
+	Items     []OrderItemResponse `json:"items"`
+}
+
+type OrderItemResponse struct {
+	ProductName string `json:"product_name"`
+	Quantity    int    `json:"quantity"`
+	Price       int64  `json:"price"`
+	Total       int64  `json:"total"`
 }
 
 type OrderItemReq struct {

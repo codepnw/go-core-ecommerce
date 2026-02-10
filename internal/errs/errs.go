@@ -21,4 +21,7 @@ var (
 )
 
 // Err Orders
-var ErrCartEmpty = errors.New("cart empty")
+var (
+	ErrCartEmpty     = errors.New("cart empty")
+	ErrOrderNotFound = errors.New("order not found")
+)

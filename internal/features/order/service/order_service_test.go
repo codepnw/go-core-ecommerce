@@ -3,11 +3,14 @@ package orderservice_test
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/codepnw/go-starter-kit/internal/errs"
 	"github.com/codepnw/go-starter-kit/internal/features/cart"
 	cartrepository "github.com/codepnw/go-starter-kit/internal/features/cart/repository"
+	"github.com/codepnw/go-starter-kit/internal/features/order"
 	orderrepository "github.com/codepnw/go-starter-kit/internal/features/order/repository"
 	orderservice "github.com/codepnw/go-starter-kit/internal/features/order/service"
 	productrepository "github.com/codepnw/go-starter-kit/internal/features/product/repository"
@@ -15,6 +18,8 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
+
+var ErrDB = errors.New("DB Error!")
 
 func TestCreateOrder(t *testing.T) {
 	type createOrderInput struct {
@@ -46,7 +51,7 @@ func TestCreateOrder(t *testing.T) {
 					},
 				).Times(1)
 
-				mockOrder.EXPECT().InsertOrderTx(gomock.Any(), gomock.Any(), input.userID, gomock.Any(), input.address).Return(int64(101), nil).Times(1)
+				mockOrder.EXPECT().InsertOrderTx(gomock.Any(), gomock.Any(), input.userID, gomock.Any(), input.address).Return(int64(101), time.Time{}, nil).Times(1)
 
 				for _, i := range mockItems {
 					mockProd.EXPECT().DecreaseStockTx(gomock.Any(), gomock.Any(), i.ProductID, i.Quantity).Return(nil).Times(1)
@@ -70,17 +75,9 @@ func TestCreateOrder(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		mockTx := database.NewMockTxManager(ctrl)
-		mockOrd := orderrepository.NewMockOrderRepository(ctrl)
-		mockProd := productrepository.NewMockProductRepository(ctrl)
-		mockCart := cartrepository.NewMockCartRepository(ctrl)
+		service, mockTx, mockOrd, mockProd, mockCart := setup(t)
 
 		tc.mockFn(mockTx, mockOrd, mockProd, mockCart, tc.input)
-
-		service := orderservice.NewOrderService(mockTx, mockOrd, mockProd, mockCart)
 
 		orderNo, err := service.CreateOrder(context.Background(), tc.input.userID, tc.input.address)
 
@@ -91,4 +88,67 @@ func TestCreateOrder(t *testing.T) {
 			assert.NotEmpty(t, orderNo)
 		}
 	}
+}
+
+func TestGetOrderDetails(t *testing.T) {
+	type testCase struct {
+		name        string
+		orderID     int64
+		mockFn      func(mockOrder *orderrepository.MockOrderRepository, mockProd *productrepository.MockProductRepository, mockCart *cartrepository.MockCartRepository, orderID int64)
+		expectedErr error
+	}
+
+	testCases := []testCase{
+		{
+			name:    "success",
+			orderID: 101,
+			mockFn: func(mockOrder *orderrepository.MockOrderRepository, mockProd *productrepository.MockProductRepository, mockCart *cartrepository.MockCartRepository, orderID int64) {
+				mockOrderData := &order.Order{
+					Items: []order.OrderItem{
+						{OrderID: orderID, ProductID: 101, ProductName: "IPhone-17", Quantity: 1, Price: 35000},
+						{OrderID: orderID, ProductID: 102, ProductName: "IPhone-17-Pro", Quantity: 2, Price: 45000},
+					},
+				}
+				mockOrder.EXPECT().FindOrderDetails(gomock.Any(), orderID).Return(mockOrderData, nil).Times(1)
+			},
+			expectedErr: nil,
+		},
+		{
+			name:    "fail get order",
+			orderID: 101,
+			mockFn: func(mockOrder *orderrepository.MockOrderRepository, mockProd *productrepository.MockProductRepository, mockCart *cartrepository.MockCartRepository, orderID int64) {
+				mockOrder.EXPECT().FindOrderDetails(gomock.Any(), orderID).Return(nil, ErrDB).Times(1)
+			},
+			expectedErr: ErrDB,
+		},
+	}
+
+	for _, tc := range testCases {
+		service, _, mockOrd, mockProd, mockCart := setup(t)
+
+		tc.mockFn(mockOrd, mockProd, mockCart, tc.orderID)
+
+		resp, err := service.GetOrderDetails(context.Background(), tc.orderID)
+
+		if tc.expectedErr != nil {
+			assert.Error(t, err)
+		} else {
+			assert.NoError(t, err)
+			assert.NotNil(t, resp)
+		}
+	}
+}
+
+func setup(t *testing.T) (orderservice.OrderService, *database.MockTxManager, *orderrepository.MockOrderRepository, *productrepository.MockProductRepository, *cartrepository.MockCartRepository) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockTx := database.NewMockTxManager(ctrl)
+	mockOrd := orderrepository.NewMockOrderRepository(ctrl)
+	mockProd := productrepository.NewMockProductRepository(ctrl)
+	mockCart := cartrepository.NewMockCartRepository(ctrl)
+
+	service := orderservice.NewOrderService(mockTx, mockOrd, mockProd, mockCart)
+
+	return service, mockTx, mockOrd, mockProd, mockCart
 }
