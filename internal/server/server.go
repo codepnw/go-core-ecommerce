@@ -2,7 +2,6 @@ package server
 
 import (
 	"database/sql"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -22,7 +21,6 @@ import (
 	"github.com/codepnw/go-starter-kit/internal/middleware"
 	"github.com/codepnw/go-starter-kit/pkg/database"
 	jwttoken "github.com/codepnw/go-starter-kit/pkg/jwttoken"
-	"github.com/codepnw/go-starter-kit/pkg/utils/response"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
@@ -33,6 +31,11 @@ type Server struct {
 	token  jwttoken.JWTToken
 	mid    *middleware.Middleware
 	tx     database.TxManager
+	// Handler Domain
+	handlerUser    *userhandler.UserHandler
+	handlerProduct *producthandler.ProductHandler
+	handlerCart    *carthandler.CartHandler
+	handlerOrder   *orderhandler.OrderHandler
 }
 
 func NewServer(cfg *config.EnvConfig, db *sql.DB) (*Server, error) {
@@ -60,16 +63,10 @@ func NewServer(cfg *config.EnvConfig, db *sql.DB) (*Server, error) {
 	}
 
 	// Gin Middleware
-	r.Use(gin.Recovery())
-	r.Use(s.mid.Logger())
-	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"*"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-		MaxAge:           12 * time.Hour,
-	}))
+	s.ginMiddleware(r)
+	
+	// Setup Domain Handler
+	s.setupHandler()
 
 	// Prefix Default: /api/v1
 	prefix := s.router.Group(cfg.APP.Prefix)
@@ -88,88 +85,37 @@ func (s *Server) Handler() http.Handler {
 	return s.router
 }
 
-func (s *Server) registerHealthRoutes(r *gin.RouterGroup) {
-	r.GET("/health", func(c *gin.Context) {
-		response.ResponseSuccess(c, http.StatusOK, "Go Starter Kit Running...")
-	})
+func (s *Server) ginMiddleware(r *gin.Engine) {
+	r.Use(gin.Recovery())
+	r.Use(s.mid.Logger())
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
 }
 
-func (s *Server) registerUserRoutes(r *gin.RouterGroup) {
-	repo := userrepository.NewUserRepository(s.db)
-	service := userservice.NewUserService(s.tx, s.token, repo)
-	handler := userhandler.NewUserHandler(service)
+func (s *Server) setupHandler() {
+	// User Handler Setup
+	userRepo := userrepository.NewUserRepository(s.db)
+	userService := userservice.NewUserService(s.tx, s.token, userRepo)
+	s.handlerUser = userhandler.NewUserHandler(userService)
 
-	// Auth Routes
-	auth := r.Group("/auth")
-	{
-		auth.POST("/register", handler.Register)
-		auth.POST("/login", handler.Login)
-		auth.POST("/refresh-token", handler.RefreshToken)
-
-		// Authorized
-		auth.POST("/logout", handler.Logout, s.mid.Authorized())
-	}
-
-	// Users Routes
-	users := r.Group("/users", s.mid.Authorized())
-	{
-		users.GET("/profile", handler.GetProfile)
-	}
-}
-
-func (s *Server) registerProductRoutes(r *gin.RouterGroup) {
-	repo := productrepository.NewProductRepository(s.db)
-	service := productservice.NewProductService(repo)
-	handler := producthandler.NewProductHandler(service)
-
-	productIDPath := fmt.Sprintf("/:%s", producthandler.ParamProductID)
-
-	// Public Routes
-	public := r.Group("/products")
-	{
-		public.GET("/", handler.GetProducts)
-		public.GET(productIDPath, handler.GetProduct)
-	}
-
-	// Authorized Routes
-	authorized := r.Group("/products", s.mid.Authorized())
-	{
-		authorized.POST("/", handler.CreateProduct)
-		authorized.PATCH(productIDPath, handler.UpdateProduct)
-		authorized.DELETE(productIDPath, handler.DeleteProduct)
-		authorized.POST(productIDPath+"/stock", handler.IncreaseStock)
-	}
-}
-
-func (s *Server) registerCartRoutes(r *gin.RouterGroup) {
+	// Product Handler Setup
 	prodRepo := productrepository.NewProductRepository(s.db)
-	prodSrv := productservice.NewProductService(prodRepo)
+	prodService := productservice.NewProductService(prodRepo)
+	s.handlerProduct = producthandler.NewProductHandler(prodService)
 
+	// Cart Handler Setup
 	cartRepo := cartrepository.NewCartRepository(s.db)
-	cartSrv := cartservice.NewCartService(cartRepo, prodSrv)
-	handler := carthandler.NewCartHandler(cartSrv)
+	cartSrv := cartservice.NewCartService(cartRepo, prodService)
+	s.handlerCart = carthandler.NewCartHandler(cartSrv)
 
-	carts := r.Group("/cart", s.mid.Authorized())
-	{
-		carts.GET("/", handler.GetCart)
-		carts.POST("/items", handler.AddItem)
-		carts.DELETE(fmt.Sprintf("/items/:%s", producthandler.ParamProductID), handler.RemoveItme)
-	}
-}
-
-func (s *Server) registerOrderRoutes(r *gin.RouterGroup) {
-	prodRepo := productrepository.NewProductRepository(s.db)
-	cartRepo := cartrepository.NewCartRepository(s.db)
-	orderRepo := orderrepository.NewOrderRepository(s.db)
-
-	service := orderservice.NewOrderService(s.tx, orderRepo, prodRepo, cartRepo)
-	handler := orderhandler.NewOrderHandler(service)
-
-	orderID := fmt.Sprintf("/:%s", orderhandler.ParamOrderID)
-
-	orders := r.Group("/orders", s.mid.Authorized())
-	{
-		orders.POST("/checkout", handler.CreateOrder)
-		orders.GET(orderID, handler.GetOrderDetails)
-	}
+	// Order Handler Setup
+	ordRepo := orderrepository.NewOrderRepository(s.db)
+	ordService := orderservice.NewOrderService(s.tx, ordRepo, prodRepo, cartRepo)
+	s.handlerOrder = orderhandler.NewOrderHandler(ordService)
 }

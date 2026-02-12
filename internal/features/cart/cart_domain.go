@@ -36,8 +36,8 @@ type CartResponse struct {
 
 type CartItemData struct {
 	ID          int64  `json:"id"`
-	ProductID   int64  `json:"product_name"`
-	ProductName string `json:"name"`
+	ProductID   int64  `json:"product_id"`
+	ProductName string `json:"product_name"`
 	Price       int    `json:"price"`
 	Quantity    int    `json:"quantity"`
 	Total       int    `json:"total"`

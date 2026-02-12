@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var ErrDB = errors.New("DB Error!")
+var ErrDB = errors.New("database error")
 
 func TestCreateOrder(t *testing.T) {
 	type createOrderInput struct {

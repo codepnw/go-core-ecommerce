@@ -10,15 +10,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type userHandler struct {
+type UserHandler struct {
 	service userservice.UserService
 }
 
-func NewUserHandler(service userservice.UserService) *userHandler {
-	return &userHandler{service: service}
+func NewUserHandler(service userservice.UserService) *UserHandler {
+	return &UserHandler{service: service}
 }
 
-func (h *userHandler) Register(c *gin.Context) {
+func (h *UserHandler) Register(c *gin.Context) {
 	req := new(RegisterReq)
 
 	if err := c.ShouldBindJSON(req); err != nil {
@@ -44,7 +44,7 @@ func (h *userHandler) Register(c *gin.Context) {
 	response.ResponseSuccess(c, http.StatusCreated, resp)
 }
 
-func (h *userHandler) Login(c *gin.Context) {
+func (h *UserHandler) Login(c *gin.Context) {
 	req := new(LoginReq)
 
 	if err := c.ShouldBindJSON(req); err != nil {
@@ -66,7 +66,7 @@ func (h *userHandler) Login(c *gin.Context) {
 	response.ResponseSuccess(c, http.StatusOK, resp)
 }
 
-func (h *userHandler) RefreshToken(c *gin.Context) {
+func (h *UserHandler) RefreshToken(c *gin.Context) {
 	req := new(RefreshTokenReq)
 
 	if err := c.ShouldBindJSON(req); err != nil {
@@ -92,7 +92,7 @@ func (h *userHandler) RefreshToken(c *gin.Context) {
 	response.ResponseSuccess(c, http.StatusOK, resp)
 }
 
-func (h *userHandler) Logout(c *gin.Context) {
+func (h *UserHandler) Logout(c *gin.Context) {
 	req := new(RefreshTokenReq)
 
 	if err := c.ShouldBindJSON(req); err != nil {
@@ -113,7 +113,7 @@ func (h *userHandler) Logout(c *gin.Context) {
 	response.ResponseSuccess(c, http.StatusNoContent, nil)
 }
 
-func (h *userHandler) GetProfile(c *gin.Context) {
+func (h *UserHandler) GetProfile(c *gin.Context) {
 	resp, err := h.service.GetProfile(c.Request.Context())
 	if err != nil {
 		switch err {

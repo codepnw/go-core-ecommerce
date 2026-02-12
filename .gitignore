@@ -12,3 +12,4 @@ go.work
 .env
 *.txt
 /tmp
+/api-collection

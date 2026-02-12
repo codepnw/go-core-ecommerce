@@ -12,15 +12,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type cartHandler struct {
+type CartHandler struct {
 	service cartservice.CartService
 }
 
-func NewCartHandler(service cartservice.CartService) *cartHandler {
-	return &cartHandler{service: service}
+func NewCartHandler(service cartservice.CartService) *CartHandler {
+	return &CartHandler{service: service}
 }
 
-func (h *cartHandler) AddItem(c *gin.Context) {
+func (h *CartHandler) AddItem(c *gin.Context) {
 	req := new(AddToCartReq)
 	if err := c.ShouldBindJSON(req); err != nil {
 		response.ResponseError(c, http.StatusBadRequest, err)
@@ -53,7 +53,7 @@ func (h *cartHandler) AddItem(c *gin.Context) {
 	response.ResponseSuccess(c, http.StatusOK, "added product to cart")
 }
 
-func (h *cartHandler) GetCart(c *gin.Context) {
+func (h *CartHandler) GetCart(c *gin.Context) {
 	userID, err := auth.GetUserIDFromContext(c.Request.Context())
 	if err != nil {
 		response.ResponseError(c, http.StatusUnauthorized, err)
@@ -74,7 +74,7 @@ func (h *cartHandler) GetCart(c *gin.Context) {
 	response.ResponseSuccess(c, http.StatusOK, resp)
 }
 
-func (h *cartHandler) RemoveItme(c *gin.Context) {
+func (h *CartHandler) RemoveItme(c *gin.Context) {
 	pIDStr := c.Param(producthandler.ParamProductID)
 	productID, err := strconv.ParseInt(pIDStr, 10, 64)
 	if err != nil {

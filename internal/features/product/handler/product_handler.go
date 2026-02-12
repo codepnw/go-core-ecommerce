@@ -12,15 +12,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type productHandler struct {
+type ProductHandler struct {
 	service productservice.ProductService
 }
 
-func NewProductHandler(service productservice.ProductService) *productHandler {
-	return &productHandler{service: service}
+func NewProductHandler(service productservice.ProductService) *ProductHandler {
+	return &ProductHandler{service: service}
 }
 
-func (h *productHandler) CreateProduct(c *gin.Context) {
+func (h *ProductHandler) CreateProduct(c *gin.Context) {
 	req := new(ProductCreateReq)
 
 	if err := c.ShouldBindJSON(req); err != nil {
@@ -48,7 +48,7 @@ func (h *productHandler) CreateProduct(c *gin.Context) {
 	response.ResponseSuccess(c, http.StatusCreated, input)
 }
 
-func (h *productHandler) GetProduct(c *gin.Context) {
+func (h *ProductHandler) GetProduct(c *gin.Context) {
 	productID, _ := strconv.Atoi(c.Param(ParamProductID))
 
 	resp, err := h.service.GetProduct(c.Request.Context(), int64(productID))
@@ -65,7 +65,7 @@ func (h *productHandler) GetProduct(c *gin.Context) {
 	response.ResponseSuccess(c, http.StatusOK, resp)
 }
 
-func (h *productHandler) GetProducts(c *gin.Context) {
+func (h *ProductHandler) GetProducts(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.Query("limit"))
 	offset, _ := strconv.Atoi(c.Query("offset"))
 
@@ -78,7 +78,7 @@ func (h *productHandler) GetProducts(c *gin.Context) {
 	response.ResponseSuccess(c, http.StatusOK, resp)
 }
 
-func (h *productHandler) IncreaseStock(c *gin.Context) {
+func (h *ProductHandler) IncreaseStock(c *gin.Context) {
 	id, err := h.getProductID(c)
 	if err != nil {
 		response.ResponseError(c, http.StatusBadRequest, err)
@@ -106,7 +106,7 @@ func (h *productHandler) IncreaseStock(c *gin.Context) {
 	response.ResponseSuccess(c, http.StatusOK, msg)
 }
 
-func (h *productHandler) UpdateProduct(c *gin.Context) {
+func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 	id, err := h.getProductID(c)
 	if err != nil {
 		response.ResponseError(c, http.StatusBadRequest, err)
@@ -136,7 +136,7 @@ func (h *productHandler) UpdateProduct(c *gin.Context) {
 	response.ResponseSuccess(c, http.StatusOK, msg)
 }
 
-func (h *productHandler) DeleteProduct(c *gin.Context) {
+func (h *ProductHandler) DeleteProduct(c *gin.Context) {
 	id, err := h.getProductID(c)
 	if err != nil {
 		response.ResponseError(c, http.StatusBadRequest, err)
@@ -156,7 +156,7 @@ func (h *productHandler) DeleteProduct(c *gin.Context) {
 	response.ResponseSuccess(c, http.StatusNoContent, nil)
 }
 
-func (h *productHandler) getProductID(c *gin.Context) (int64, error) {
+func (h *ProductHandler) getProductID(c *gin.Context) (int64, error) {
 	id, err := strconv.Atoi(c.Param(ParamProductID))
 	if err != nil {
 		return 0, err
