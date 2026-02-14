@@ -81,6 +81,7 @@ func (s *Server) registerOrderRoutes(r *gin.RouterGroup) {
 
 	orders := r.Group("/orders", s.mid.Authorized())
 	{
+		orders.GET("/", handler.MyOrders)
 		orders.POST("/checkout", handler.CreateOrder)
 		orders.GET(paramID, handler.GetOrderDetails)
 	}

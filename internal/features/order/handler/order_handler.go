@@ -65,3 +65,27 @@ func (h *OrderHandler) GetOrderDetails(c *gin.Context) {
 
 	response.ResponseSuccess(c, http.StatusOK, resp)
 }
+
+func (h *OrderHandler) MyOrders(c *gin.Context) {
+	userID, err := auth.GetUserIDFromContext(c.Request.Context())
+	if err != nil {
+		response.ResponseError(c, http.StatusUnauthorized, err)
+		return
+	}
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+
+	resp, err := h.service.MyOrders(c.Request.Context(), userID, page, limit)
+	if err != nil {
+		switch err {
+		case errs.ErrUserNotFound:
+			response.ResponseError(c, http.StatusNotFound, err)
+		default:
+			response.ResponseError(c, http.StatusInternalServerError, err)
+		}
+		return
+	}
+
+	response.ResponseSuccess(c, http.StatusOK, resp)
+}

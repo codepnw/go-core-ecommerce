@@ -60,3 +60,20 @@ type OrderItemReq struct {
 	Quantity  int   `json:"quantity"`
 	Price     int   `json:"price"`
 }
+
+type OrderListResponse struct {
+	Orders      []*OrderResponse `json:"orders"`
+	TotalOrders int64            `json:"total_orders"`
+	Page        int              `json:"page"`
+	Limit       int              `json:"limit"`
+	TotalPage   int              `json:"total_page"`
+	HasNextPage bool             `json:"has_next_page"`
+	HasPrevPage bool             `json:"has_prev_page"`
+}
+
+type OrderResponse struct {
+	OrderNo     string      `json:"order_no"`
+	Status      OrderStatus `json:"status"`
+	TotalAmount int64       `json:"total_amount"`
+	CreatedAt   string      `json:"created_at"`
+}

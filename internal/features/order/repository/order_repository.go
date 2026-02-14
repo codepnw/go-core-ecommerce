@@ -14,6 +14,7 @@ import (
 //go:generate mockgen -source=order_repository.go -destination=order_repository_mock.go -package=orderrepository
 type OrderRepository interface {
 	FindOrderDetails(ctx context.Context, orderID int64) (*order.Order, error)
+	FindMyOrders(ctx context.Context, userID string, limit, offset int) ([]*order.Order, int64, error)
 
 	// Transaction
 	InsertOrderTx(ctx context.Context, tx *sql.Tx, userID string, totalAmount int64, address string) (int64, time.Time, error)
@@ -92,7 +93,7 @@ func (r *orderRepository) FindOrderDetails(ctx context.Context, orderID int64) (
 func (r *orderRepository) InsertOrderTx(ctx context.Context, tx *sql.Tx, userID string, totalAmount int64, address string) (int64, time.Time, error) {
 	var orderID int64
 	var createdAt time.Time
-	
+
 	query := `
 		INSERT INTO orders (user_id, total_amount, status, address)
 		VALUES ($1, $2, 'PENDING', $3) RETURNING id, created_at
@@ -114,4 +115,49 @@ func (r *orderRepository) InsertOrderItemTx(ctx context.Context, tx *sql.Tx, ite
 		return err
 	}
 	return nil
+}
+
+func (r *orderRepository) FindMyOrders(ctx context.Context, userID string, limit, offset int) ([]*order.Order, int64, error) {
+	query := `
+		SELECT id, created_at, status, total_amount
+		FROM orders
+		WHERE user_id = $1 ORDER BY created_at DESC
+		LIMIT $2 OFFSET $3
+	`
+	rows, err := r.db.QueryContext(ctx, query, userID, limit, offset)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, 0, errs.ErrUserNotFound
+		}
+		return nil, 0, err
+	}
+	defer rows.Close()
+	
+	var orders []*order.Order
+	
+	for rows.Next() {
+		o := new(order.Order)
+		if err := rows.Scan(
+			&o.ID,
+			&o.CreatedAt,
+			&o.Status,
+			&o.TotalAmount,
+		); err != nil {
+			return nil, 0, err
+		}
+		orders = append(orders, o)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0 ,err
+	}
+	
+	// --- Count Orders
+	var total int64
+	queryCount := `SELECT COUNT(*) FROM orders WHERE user_id = $1`
+	
+	err = r.db.QueryRowContext(ctx, queryCount, userID).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+	return orders, total, nil
 }

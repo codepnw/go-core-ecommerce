@@ -139,6 +139,53 @@ func TestGetOrderDetails(t *testing.T) {
 	}
 }
 
+func TestMyOrders(t *testing.T) {
+	type testCase struct {
+		name        string
+		userID      string
+		mockFn      func(mockOrder *orderrepository.MockOrderRepository, userID string)
+		expectedErr error
+	}
+
+	testCases := []testCase{
+		{
+			name:   "success",
+			userID: "mock-uuid-01",
+			mockFn: func(mockOrder *orderrepository.MockOrderRepository, userID string) {
+				mockOrdersResp := []*order.Order{
+					{ID: 1, TotalAmount: 2000, Status: order.StatusPending, CreatedAt: time.Now()},
+					{ID: 2, TotalAmount: 500, Status: order.StatusPending, CreatedAt: time.Now()},
+				}
+				mockOrder.EXPECT().FindMyOrders(gomock.Any(), userID, gomock.Any(), gomock.Any()).Return(mockOrdersResp, int64(10), nil).Times(1)
+			},
+			expectedErr: nil,
+		},
+		{
+			name:   "fail",
+			userID: "mock-uuid-01",
+			mockFn: func(mockOrder *orderrepository.MockOrderRepository, userID string) {
+				mockOrder.EXPECT().FindMyOrders(gomock.Any(), userID, gomock.Any(), gomock.Any()).Return(nil, int64(0), ErrDB).Times(1)
+			},
+			expectedErr: ErrDB,
+		},
+	}
+
+	for _, tc := range testCases {
+		service, _, mockOrd, _, _ := setup(t)
+
+		tc.mockFn(mockOrd, tc.userID)
+
+		resp, err := service.MyOrders(context.Background(), "mock-uuid-01", 0, 0)
+
+		if tc.expectedErr != nil {
+			assert.Error(t, err)
+		} else {
+			assert.NoError(t, err)
+			assert.NotNil(t, resp)
+		}
+	}
+}
+
 func setup(t *testing.T) (orderservice.OrderService, *database.MockTxManager, *orderrepository.MockOrderRepository, *productrepository.MockProductRepository, *cartrepository.MockCartRepository) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

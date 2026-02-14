@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/codepnw/go-starter-kit/internal/config"
@@ -18,6 +19,7 @@ import (
 type OrderService interface {
 	CreateOrder(ctx context.Context, userID, address string) (string, error)
 	GetOrderDetails(ctx context.Context, orderID int64) (*order.OrderDetailResponse, error)
+	MyOrders(ctx context.Context, userID string, page, limit int) (*order.OrderListResponse, error)
 }
 
 type orderService struct {
@@ -50,7 +52,7 @@ func (s *orderService) GetOrderDetails(ctx context.Context, orderID int64) (*ord
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Details Response
 	resp := &order.OrderDetailResponse{
 		OrderNo:   generateOrderNo(ordData.ID, ordData.CreatedAt),
@@ -60,7 +62,7 @@ func (s *orderService) GetOrderDetails(ctx context.Context, orderID int64) (*ord
 		Amount:    int64(ordData.TotalAmount),
 		Items:     make([]order.OrderItemResponse, 0),
 	}
-	
+
 	// Add Items Response
 	for _, item := range ordData.Items {
 		ordItem := order.OrderItemResponse{
@@ -137,6 +139,50 @@ func (s *orderService) CreateOrder(ctx context.Context, userID, address string) 
 	}
 
 	return generateOrderNo(orderID, orderCreatedAt), nil
+}
+
+// MyOrders implements OrderService.
+func (s *orderService) MyOrders(ctx context.Context, userID string, page, limit int) (*order.OrderListResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, config.ContextTimeout)
+	defer cancel()
+
+	if page <= 0 {
+		page = 1
+	}
+	if limit <= 0 {
+		limit = 10
+	}
+	offset := (page - 1) * limit
+
+	// Find My Orders
+	orders, total, err := s.orderRepo.FindMyOrders(ctx, userID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	totalPage := int(math.Ceil(float64(total) / float64(limit)))
+
+	// Response
+	resp := &order.OrderListResponse{
+		Orders:      make([]*order.OrderResponse, 0, len(orders)),
+		TotalOrders: total,
+		Page:        page,
+		Limit:       limit,
+		TotalPage:   totalPage,
+		HasNextPage: page < totalPage,
+		HasPrevPage: page > 1,
+	}
+
+	for _, item := range orders {
+		o := &order.OrderResponse{
+			OrderNo:     generateOrderNo(item.ID, item.CreatedAt),
+			TotalAmount: int64(item.TotalAmount),
+			Status:      item.Status,
+			CreatedAt:   item.CreatedAt.Format(time.DateTime),
+		}
+		resp.Orders = append(resp.Orders, o)
+	}
+	return resp, nil
 }
 
 // -------- HELPER ------------
