@@ -24,6 +24,14 @@ func GetUserIDFromContext(ctx context.Context) (string, error) {
 	return userID, nil
 }
 
+func GetUserRoleFromContext(ctx context.Context) (string, error) {
+	role, ok := ctx.Value(config.ContextUserRoleKey).(string)
+	if !ok {
+		return "", errors.New("get role context failed")
+	}
+	return role, nil
+}
+
 func SetContextUserID(ctx context.Context, userID string) context.Context {
 	return context.WithValue(ctx, config.ContextUserIDKey, userID)
 }

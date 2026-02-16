@@ -3,12 +3,15 @@ package middleware
 import (
 	"context"
 	"errors"
+	"log"
 	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/codepnw/go-starter-kit/internal/auth"
 	"github.com/codepnw/go-starter-kit/internal/config"
+	"github.com/codepnw/go-starter-kit/internal/features/user"
 	jwttoken "github.com/codepnw/go-starter-kit/pkg/jwttoken"
 	"github.com/codepnw/go-starter-kit/pkg/utils/response"
 	"github.com/gin-gonic/gin"
@@ -48,9 +51,29 @@ func (m *Middleware) Authorized() gin.HandlerFunc {
 		ctx := c.Request.Context()
 		ctx = context.WithValue(ctx, config.ContextUserClaimsKey, claims)
 		ctx = context.WithValue(ctx, config.ContextUserIDKey, claims.UserID)
+		ctx = context.WithValue(ctx, config.ContextUserRoleKey, claims.Role)
 
 		c.Request = c.Request.WithContext(ctx)
 		c.Next()
+	}
+}
+
+func (m *Middleware) AdminOnly() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		userRole, err := auth.GetUserRoleFromContext(ctx.Request.Context())
+		if err != nil {
+			log.Println("Error get context role:", err)
+			response.ResponseError(ctx, http.StatusForbidden, errors.New("no permissions"))
+			ctx.Abort()
+			return
+		}
+
+		if userRole != string(user.RoleAdmin) {
+			response.ResponseError(ctx, http.StatusForbidden, errors.New("no permissions"))
+			ctx.Abort()
+			return
+		}
+		ctx.Next()
 	}
 }
 

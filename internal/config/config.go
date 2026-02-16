@@ -19,6 +19,7 @@ const (
 	// Context keys
 	ContextUserClaimsKey contextKey = "ctx-user-claims"
 	ContextUserIDKey     contextKey = "ctx-user-id"
+	ContextUserRoleKey   contextKey = "ctx-user-role"
 
 	ContextTimeout = time.Second * 10
 )

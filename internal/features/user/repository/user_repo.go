@@ -62,13 +62,14 @@ func (r *userRepository) CheckEmailExists(ctx context.Context, email string) (bo
 func (r *userRepository) FindUserByEmail(ctx context.Context, email string) (*user.User, error) {
 	var u user.User
 	query := `
-		SELECT id, email, password
+		SELECT id, email, password, role
 		FROM users WHERE email = $1 LIMIT 1
 	`
 	if err := r.db.QueryRowContext(ctx, query, email).Scan(
 		&u.ID,
 		&u.Email,
 		&u.Password,
+		&u.Role,
 	); err != nil {
 		return nil, err
 	}

@@ -38,6 +38,7 @@ func NewJWTToken(appName, secretKey, refreshKey string) (JWTToken, error) {
 type UserClaims struct {
 	UserID string
 	Email  string
+	Role   string
 	*jwt.RegisteredClaims
 }
 
@@ -55,6 +56,7 @@ func (j *token) generateToken(key string, u *user.User, duration time.Duration) 
 	claims := &UserClaims{
 		UserID: u.ID,
 		Email:  u.Email,
+		Role:   string(u.Role),
 		RegisteredClaims: &jwt.RegisteredClaims{
 			Subject:   u.ID,
 			Issuer:    j.appName,
