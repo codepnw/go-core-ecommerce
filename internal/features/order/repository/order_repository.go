@@ -19,6 +19,8 @@ type OrderRepository interface {
 	// Transaction
 	InsertOrderTx(ctx context.Context, tx *sql.Tx, userID string, totalAmount int64, address string) (int64, time.Time, error)
 	InsertOrderItemTx(ctx context.Context, tx *sql.Tx, item order.OrderItemReq) error
+	FindOrderItemsTx(ctx context.Context, tx *sql.Tx, orderID int64) ([]*order.OrderItem, error)
+	UpdateStatusTx(ctx context.Context, tx *sql.Tx, orderID int64, status order.OrderStatus) error
 }
 
 type orderRepository struct {
@@ -132,9 +134,9 @@ func (r *orderRepository) FindMyOrders(ctx context.Context, userID string, limit
 		return nil, 0, err
 	}
 	defer rows.Close()
-	
+
 	var orders []*order.Order
-	
+
 	for rows.Next() {
 		o := new(order.Order)
 		if err := rows.Scan(
@@ -148,16 +150,64 @@ func (r *orderRepository) FindMyOrders(ctx context.Context, userID string, limit
 		orders = append(orders, o)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, 0 ,err
+		return nil, 0, err
 	}
-	
+
 	// --- Count Orders
 	var total int64
 	queryCount := `SELECT COUNT(*) FROM orders WHERE user_id = $1`
-	
+
 	err = r.db.QueryRowContext(ctx, queryCount, userID).Scan(&total)
 	if err != nil {
 		return nil, 0, err
 	}
 	return orders, total, nil
+}
+
+func (r *orderRepository) FindOrderItemsTx(ctx context.Context, tx *sql.Tx, orderID int64) ([]*order.OrderItem, error) {
+	query := `
+		SELECT product_id, quantity
+		FROM order_items
+		WHERE order_id = $1
+	`
+	rows, err := tx.QueryContext(ctx, query, orderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var orders []*order.OrderItem
+
+	for rows.Next() {
+		item := new(order.OrderItem)
+		if err := rows.Scan(
+			&item.ProductID,
+			&item.Quantity,
+		); err != nil {
+			return nil, err
+		}
+		orders = append(orders, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return orders, nil
+}
+
+func (r *orderRepository) UpdateStatusTx(ctx context.Context, tx *sql.Tx, orderID int64, status order.OrderStatus) error {
+	query := `UPDATE orders SET status = $1 WHERE id = $2`
+	res, err := tx.ExecContext(ctx, query, status, orderID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return errs.ErrOrderNotFound
+		}
+		return err
+	}
+
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		return errs.ErrOrderNotFound
+	}
+	return nil
 }

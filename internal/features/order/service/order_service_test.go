@@ -186,6 +186,79 @@ func TestMyOrders(t *testing.T) {
 	}
 }
 
+func TestUpdateStatus(t *testing.T) {
+	type testCase struct {
+		name        string
+		orderID     int64
+		newStatus   order.OrderStatus
+		mockFn      func(mockTx *database.MockTxManager, mockOrder *orderrepository.MockOrderRepository, orderID int64, newStatus order.OrderStatus)
+		expectedErr error
+	}
+
+	testCases := []testCase{
+		{
+			name:      "success",
+			orderID:   101,
+			newStatus: order.StatusPaid,
+			mockFn: func(mockTx *database.MockTxManager, mockOrder *orderrepository.MockOrderRepository, orderID int64, newStatus order.OrderStatus) {
+				mockData := &order.Order{Status: "PENDING"}
+				mockOrder.EXPECT().FindOrderDetails(gomock.Any(), orderID).Return(mockData, nil).Times(1)
+				
+				mockTx.EXPECT().WithTx(gomock.Any(), gomock.Any()).DoAndReturn(
+					func(ctx context.Context, fn func(tx *sql.Tx) error) error {
+						return fn(nil)
+					},
+				)
+				
+				mockOrder.EXPECT().UpdateStatusTx(gomock.Any(), gomock.Any(), orderID, newStatus).Return(nil).Times(1)
+			},
+			expectedErr: nil,
+		},
+		{
+			name:      "fail status transition",
+			orderID:   101,
+			newStatus: order.StatusShipped,
+			mockFn: func(mockTx *database.MockTxManager, mockOrder *orderrepository.MockOrderRepository, orderID int64, newStatus order.OrderStatus) {
+				mockData := &order.Order{Status: "PENDING"}
+				mockOrder.EXPECT().FindOrderDetails(gomock.Any(), orderID).Return(mockData, nil).Times(1)
+			},
+			expectedErr: errors.New("invalid status transition"),
+		},
+		{
+			name:      "fail update status",
+			orderID:   101,
+			newStatus: order.StatusPaid,
+			mockFn: func(mockTx *database.MockTxManager, mockOrder *orderrepository.MockOrderRepository, orderID int64, newStatus order.OrderStatus) {
+				mockData := &order.Order{Status: "PENDING"}
+				mockOrder.EXPECT().FindOrderDetails(gomock.Any(), orderID).Return(mockData, nil).Times(1)
+				
+				mockTx.EXPECT().WithTx(gomock.Any(), gomock.Any()).DoAndReturn(
+					func(ctx context.Context, fn func(tx *sql.Tx) error) error {
+						return fn(nil)
+					},
+				)
+				
+				mockOrder.EXPECT().UpdateStatusTx(gomock.Any(), gomock.Any(), orderID, newStatus).Return(ErrDB).Times(1)
+			},
+			expectedErr: ErrDB,
+		},
+	}
+
+	for _, tc := range testCases {
+		service, mockTx, mockOrd, _, _ := setup(t)
+
+		tc.mockFn(mockTx, mockOrd, tc.orderID, tc.newStatus)
+
+		err := service.UpdateStatus(context.Background(), tc.orderID, tc.newStatus)
+
+		if tc.expectedErr != nil {
+			assert.Error(t, err)
+		} else {
+			assert.NoError(t, err)
+		}
+	}
+}
+
 func setup(t *testing.T) (orderservice.OrderService, *database.MockTxManager, *orderrepository.MockOrderRepository, *productrepository.MockProductRepository, *cartrepository.MockCartRepository) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

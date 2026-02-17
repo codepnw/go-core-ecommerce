@@ -68,6 +68,21 @@ func (mr *MockOrderRepositoryMockRecorder) FindOrderDetails(ctx, orderID interfa
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindOrderDetails", reflect.TypeOf((*MockOrderRepository)(nil).FindOrderDetails), ctx, orderID)
 }
 
+// FindOrderItemsTx mocks base method.
+func (m *MockOrderRepository) FindOrderItemsTx(ctx context.Context, tx *sql.Tx, orderID int64) ([]*order.OrderItem, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindOrderItemsTx", ctx, tx, orderID)
+	ret0, _ := ret[0].([]*order.OrderItem)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindOrderItemsTx indicates an expected call of FindOrderItemsTx.
+func (mr *MockOrderRepositoryMockRecorder) FindOrderItemsTx(ctx, tx, orderID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindOrderItemsTx", reflect.TypeOf((*MockOrderRepository)(nil).FindOrderItemsTx), ctx, tx, orderID)
+}
+
 // InsertOrderItemTx mocks base method.
 func (m *MockOrderRepository) InsertOrderItemTx(ctx context.Context, tx *sql.Tx, item order.OrderItemReq) error {
 	m.ctrl.T.Helper()
@@ -96,4 +111,18 @@ func (m *MockOrderRepository) InsertOrderTx(ctx context.Context, tx *sql.Tx, use
 func (mr *MockOrderRepositoryMockRecorder) InsertOrderTx(ctx, tx, userID, totalAmount, address interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertOrderTx", reflect.TypeOf((*MockOrderRepository)(nil).InsertOrderTx), ctx, tx, userID, totalAmount, address)
+}
+
+// UpdateStatusTx mocks base method.
+func (m *MockOrderRepository) UpdateStatusTx(ctx context.Context, tx *sql.Tx, orderID int64, status order.OrderStatus) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateStatusTx", ctx, tx, orderID, status)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateStatusTx indicates an expected call of UpdateStatusTx.
+func (mr *MockOrderRepositoryMockRecorder) UpdateStatusTx(ctx, tx, orderID, status interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateStatusTx", reflect.TypeOf((*MockOrderRepository)(nil).UpdateStatusTx), ctx, tx, orderID, status)
 }

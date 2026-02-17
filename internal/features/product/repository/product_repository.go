@@ -18,9 +18,10 @@ type ProductRepository interface {
 	UpdateProduct(ctx context.Context, input *product.Product) error
 	DeleteProduct(ctx context.Context, productID int64) error
 	IncreaseStock(ctx context.Context, productID int64, qty int) error
-	
+
 	// Transaction
 	DecreaseStockTx(ctx context.Context, tx *sql.Tx, productID int64, qty int) error
+	IncreaseStockTx(ctx context.Context, tx *sql.Tx, productID int64, qty int) error
 }
 
 type productRepository struct {
@@ -188,6 +189,27 @@ func (r *productRepository) DecreaseStockTx(ctx context.Context, tx *sql.Tx, pro
 
 	if rows == 0 {
 		return errs.ErrStockNotEnough
+	}
+	return nil
+}
+
+func (r *productRepository) IncreaseStockTx(ctx context.Context, tx *sql.Tx, productID int64, qty int) error {
+	query := `
+		UPDATE products SET stock = stock + $1, version = version + 1
+		WHERE id = $2
+	`
+	res, err := tx.ExecContext(ctx, query, qty, productID)
+	if err != nil {
+		return err
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rows == 0 {
+		return errs.ErrProductNotFound
 	}
 	return nil
 }

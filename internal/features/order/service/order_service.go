@@ -20,6 +20,7 @@ type OrderService interface {
 	CreateOrder(ctx context.Context, userID, address string) (string, error)
 	GetOrderDetails(ctx context.Context, orderID int64) (*order.OrderDetailResponse, error)
 	MyOrders(ctx context.Context, userID string, page, limit int) (*order.OrderListResponse, error)
+	UpdateStatus(ctx context.Context, orderID int64, status order.OrderStatus) error
 }
 
 type orderService struct {
@@ -185,7 +186,80 @@ func (s *orderService) MyOrders(ctx context.Context, userID string, page, limit 
 	return resp, nil
 }
 
-// -------- HELPER ------------
+// UpdateStatus implements OrderService.
+func (s *orderService) UpdateStatus(ctx context.Context, orderID int64, newStatus order.OrderStatus) error {
+	ctx, cancel := context.WithTimeout(ctx, config.ContextTimeout)
+	defer cancel()
+	
+	// Order Details
+	orderData, err := s.orderRepo.FindOrderDetails(ctx, orderID)
+	if err != nil {
+		return err
+	}
+	currentStatus := orderData.Status
+	
+	// Check Status Transition
+	if !isValidStatus(currentStatus, newStatus) {
+		return errs.ErrInvalidStatusTransition
+	}
+	
+	// Cancel Order Method
+	if newStatus == order.StatusCancelled {
+		return s.cancelOrder(ctx, orderID)
+	}
+
+	return s.tx.WithTx(ctx, func(tx *sql.Tx) error {
+		// Update New Status
+		if err := s.orderRepo.UpdateStatusTx(ctx, tx, orderID, newStatus); err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+// -------- Private Method ------------
+
+func (s *orderService) cancelOrder(ctx context.Context, orderID int64) error {
+	return s.tx.WithTx(ctx, func(tx *sql.Tx) error {
+		items, err := s.orderRepo.FindOrderItemsTx(ctx, tx, orderID)
+		if err != nil {
+			return err
+		}
+
+		for _, item := range items {
+			if err := s.prodRepo.IncreaseStockTx(ctx, tx, item.ProductID, item.Quantity); err != nil {
+				return err
+			}
+		}
+
+		if err := s.orderRepo.UpdateStatusTx(ctx, tx, orderID, order.StatusCancelled); err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+// -------- HELPER Function ------------
+
+func isValidStatus(oldStatus, newStatus order.OrderStatus) bool {
+	// Pending 		-> (Paid, Cancelled)
+	// Paid 		-> (Shipped, Cancelled)
+	// Shipped 		-> Completed
+	// Completed  	-> End Process
+	// Cancelled	-> End Process
+	switch oldStatus {
+	case order.StatusPending:
+		return newStatus == order.StatusPaid || newStatus == order.StatusCancelled
+	case order.StatusPaid:
+		return newStatus == order.StatusShipped || newStatus == order.StatusCancelled
+	case order.StatusShipped:
+		return newStatus == order.StatusCompleted
+	case order.StatusCompleted, order.StatusCancelled:
+		return false
+	default:
+		return false
+	}
+}
 
 func generateOrderNo(orderID int64, createdAt time.Time) string {
 	now := createdAt.Format("20060201")

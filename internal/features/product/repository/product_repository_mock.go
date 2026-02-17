@@ -93,6 +93,20 @@ func (mr *MockProductRepositoryMockRecorder) IncreaseStock(ctx, productID, qty i
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IncreaseStock", reflect.TypeOf((*MockProductRepository)(nil).IncreaseStock), ctx, productID, qty)
 }
 
+// IncreaseStockTx mocks base method.
+func (m *MockProductRepository) IncreaseStockTx(ctx context.Context, tx *sql.Tx, productID int64, qty int) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IncreaseStockTx", ctx, tx, productID, qty)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// IncreaseStockTx indicates an expected call of IncreaseStockTx.
+func (mr *MockProductRepositoryMockRecorder) IncreaseStockTx(ctx, tx, productID, qty interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IncreaseStockTx", reflect.TypeOf((*MockProductRepository)(nil).IncreaseStockTx), ctx, tx, productID, qty)
+}
+
 // InsertProduct mocks base method.
 func (m *MockProductRepository) InsertProduct(ctx context.Context, input *product.Product) error {
 	m.ctrl.T.Helper()

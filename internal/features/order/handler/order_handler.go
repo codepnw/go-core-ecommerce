@@ -1,11 +1,13 @@
 package orderhandler
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/codepnw/go-starter-kit/internal/auth"
 	"github.com/codepnw/go-starter-kit/internal/errs"
+	"github.com/codepnw/go-starter-kit/internal/features/order"
 	orderservice "github.com/codepnw/go-starter-kit/internal/features/order/service"
 	"github.com/codepnw/go-starter-kit/pkg/utils/response"
 	"github.com/gin-gonic/gin"
@@ -88,4 +90,31 @@ func (h *OrderHandler) MyOrders(c *gin.Context) {
 	}
 
 	response.ResponseSuccess(c, http.StatusOK, resp)
+}
+
+func (h *OrderHandler) UpdateStatus(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param(ParamOrderID), 10, 64)
+	if err != nil {
+		response.ResponseError(c, http.StatusBadRequest, err)
+		return
+	}
+
+	req := new(UpdateStatusReq)
+	if err := c.ShouldBindJSON(req); err != nil {
+		response.ResponseError(c, http.StatusBadRequest, err)
+		return
+	}
+
+	err = h.service.UpdateStatus(c.Request.Context(), id, order.OrderStatus(req.Status))
+	if err != nil {
+		switch err {
+		case errs.ErrInvalidStatusTransition:
+			response.ResponseError(c, http.StatusBadRequest, err)
+		default:
+			response.ResponseError(c, http.StatusInternalServerError, err)
+		}
+		return
+	}
+
+	response.ResponseSuccess(c, http.StatusOK, fmt.Sprintf("order id %d status %s updated", id, req.Status))
 }

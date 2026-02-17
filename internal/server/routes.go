@@ -85,4 +85,10 @@ func (s *Server) registerOrderRoutes(r *gin.RouterGroup) {
 		orders.POST("/checkout", handler.CreateOrder)
 		orders.GET(paramID, handler.GetOrderDetails)
 	}
+	
+	// Admin Only
+	admin := r.Group("/orders", s.mid.Authorized(), s.mid.AdminOnly())
+	{
+		admin.PATCH(paramID+"/status", handler.UpdateStatus)
+	}
 }
