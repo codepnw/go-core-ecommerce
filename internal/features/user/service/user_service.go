@@ -3,6 +3,7 @@ package userservice
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/codepnw/go-starter-kit/pkg/database"
 	jwttoken "github.com/codepnw/go-starter-kit/pkg/jwttoken"
 	"github.com/codepnw/go-starter-kit/pkg/utils/password"
+	"github.com/redis/go-redis/v9"
 )
 
 type UserService interface {
@@ -21,20 +23,22 @@ type UserService interface {
 	Login(ctx context.Context, email, password string) (*UserTokenResponse, error)
 	RefreshToken(ctx context.Context, token string) (*UserTokenResponse, error)
 	Logout(ctx context.Context, token string) error
-	GetProfile(ctx context.Context) (*user.User, error)
+	GetProfile(ctx context.Context, userID string) (*user.User, error)
 }
 
 type userService struct {
-	tx    database.TxManager
-	token jwttoken.JWTToken
-	repo  userrepository.UserRepository
+	tx      database.TxManager
+	token   jwttoken.JWTToken
+	repo    userrepository.UserRepository
+	redisDB *redis.Client
 }
 
-func NewUserService(tx database.TxManager, token jwttoken.JWTToken, repo userrepository.UserRepository) UserService {
+func NewUserService(tx database.TxManager, token jwttoken.JWTToken, repo userrepository.UserRepository, redisDB *redis.Client) UserService {
 	return &userService{
-		tx:    tx,
-		token: token,
-		repo:  repo,
+		tx:      tx,
+		token:   token,
+		repo:    repo,
+		redisDB: redisDB,
 	}
 }
 
@@ -200,19 +204,31 @@ func (s *userService) Logout(ctx context.Context, token string) error {
 	return nil
 }
 
-func (s *userService) GetProfile(ctx context.Context) (*user.User, error) {
+func (s *userService) GetProfile(ctx context.Context, userID string) (*user.User, error) {
 	ctx, cancel := context.WithTimeout(ctx, config.ContextTimeout)
 	defer cancel()
 
-	userID, err := auth.GetUserIDFromContext(ctx)
-	if err != nil {
-		return nil, err
+	redisKey := generateRedisKey(userID)
+	// Get Redis DB
+	val, err := s.redisDB.Get(ctx, redisKey).Result()
+	if err == nil {
+		var u *user.User
+		if err := json.Unmarshal([]byte(val), u); err == nil {
+			return u, nil
+		}
 	}
 
+	// Get User Repository
 	userData, err := s.repo.FindUserByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
+	
+	// Set Redis DB
+	if data, err := json.Marshal(userData); err == nil {
+		s.redisDB.Set(ctx, redisKey, data, config.RedisUserDuration)
+	}
+
 	return userData, nil
 }
 
@@ -243,4 +259,8 @@ func (s *userService) insertRefreshTokenInput(userID, token string) *user.Refres
 		ExpiresAt: time.Now().Add(config.RefreshTokenDuration),
 		Revoked:   false,
 	}
+}
+
+func generateRedisKey(userID string) string {
+	return fmt.Sprintf("user:profile:%s", userID)
 }

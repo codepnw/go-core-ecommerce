@@ -3,6 +3,7 @@ package userhandler
 import (
 	"net/http"
 
+	"github.com/codepnw/go-starter-kit/internal/auth"
 	"github.com/codepnw/go-starter-kit/internal/errs"
 	"github.com/codepnw/go-starter-kit/internal/features/user"
 	userservice "github.com/codepnw/go-starter-kit/internal/features/user/service"
@@ -114,7 +115,13 @@ func (h *UserHandler) Logout(c *gin.Context) {
 }
 
 func (h *UserHandler) GetProfile(c *gin.Context) {
-	resp, err := h.service.GetProfile(c.Request.Context())
+	userID, err := auth.GetUserIDFromContext(c.Request.Context())
+	if err != nil {
+		response.ResponseError(c, http.StatusUnauthorized, err)
+		return
+	}
+	
+	resp, err := h.service.GetProfile(c.Request.Context(), userID)
 	if err != nil {
 		switch err {
 		case errs.ErrUserNotFound:

@@ -14,13 +14,16 @@ test-logic:
 
 #----------------- Start Docker -----------
 # -----------------------------------------
-# build db & app
+# build db, app, redis
 docker-up:
 	@docker compose up -d --build
 
 # Dev Mode: build db only
 docker-db:
 	@docker compose up -d db
+	
+docker-redis:
+	@docker compose up -d redis
 
 # clear volumns data
 docker-clear:

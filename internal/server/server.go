@@ -23,6 +23,7 @@ import (
 	jwttoken "github.com/codepnw/go-starter-kit/pkg/jwttoken"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 )
 
 type Server struct {
@@ -31,6 +32,8 @@ type Server struct {
 	token  jwttoken.JWTToken
 	mid    *middleware.Middleware
 	tx     database.TxManager
+	redis  *redis.Client
+
 	// Handler Domain
 	handlerUser    *userhandler.UserHandler
 	handlerProduct *producthandler.ProductHandler
@@ -52,6 +55,12 @@ func NewServer(cfg *config.EnvConfig, db *sql.DB) (*Server, error) {
 
 	// DB Transaction
 	tx := database.NewDBTransaction(db)
+	
+	// Init Redis
+	redis, err := database.InitRedis(cfg)
+	if err != nil {
+		return nil, err
+	}
 
 	// Denpendency Injection
 	s := &Server{
@@ -60,11 +69,12 @@ func NewServer(cfg *config.EnvConfig, db *sql.DB) (*Server, error) {
 		token:  token,
 		mid:    mid,
 		tx:     tx,
+		redis:  redis,
 	}
 
 	// Gin Middleware
 	s.ginMiddleware(r)
-	
+
 	// Setup Domain Handler
 	s.setupHandler()
 
@@ -101,12 +111,12 @@ func (s *Server) ginMiddleware(r *gin.Engine) {
 func (s *Server) setupHandler() {
 	// User Handler Setup
 	userRepo := userrepository.NewUserRepository(s.db)
-	userService := userservice.NewUserService(s.tx, s.token, userRepo)
+	userService := userservice.NewUserService(s.tx, s.token, userRepo, s.redis)
 	s.handlerUser = userhandler.NewUserHandler(userService)
 
 	// Product Handler Setup
 	prodRepo := productrepository.NewProductRepository(s.db)
-	prodService := productservice.NewProductService(prodRepo)
+	prodService := productservice.NewProductService(prodRepo, s.redis)
 	s.handlerProduct = producthandler.NewProductHandler(prodService)
 
 	// Cart Handler Setup

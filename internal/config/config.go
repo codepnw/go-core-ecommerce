@@ -22,12 +22,17 @@ const (
 	ContextUserRoleKey   contextKey = "ctx-user-role"
 
 	ContextTimeout = time.Second * 10
+
+	// Redis Duration
+	RedisProductDuration = time.Minute * 10
+	RedisUserDuration    = time.Minute * 60
 )
 
 type EnvConfig struct {
-	APP AppConfig `envPrefix:"APP_"`
-	DB  DBConfig  `envPrefix:"DB_"`
-	JWT JWTConfig `envPrefix:"JWT_"`
+	APP   AppConfig   `envPrefix:"APP_"`
+	DB    DBConfig    `envPrefix:"DB_"`
+	JWT   JWTConfig   `envPrefix:"JWT_"`
+	Redis RedisConfig `envPrefix:"REDIS_"`
 }
 
 type AppConfig struct {
@@ -49,6 +54,11 @@ type JWTConfig struct {
 	AppName    string `env:"APP_NAME" envDefault:"Go Starter Kit"`
 	SecretKey  string `env:"SECRET_KEY" validate:"required"`
 	RefreshKey string `env:"REFRESH_KEY" validate:"required"`
+}
+
+type RedisConfig struct {
+	Addr     string `env:"ADDR" envDefault:"localhost:6379"`
+	Password string `env:"PASSWORD" validate:"required"`
 }
 
 func LoadConfig(path string) (*EnvConfig, error) {

@@ -413,7 +413,7 @@ func setup(t *testing.T) (*jwttoken.MockJWTToken, *database.MockTxManager, *user
 	mockTx := database.NewMockTxManager(ctrl)
 	mockRepo := userrepository.NewMockUserRepository(ctrl)
 
-	service := userservice.NewUserService(mockTx, mockToken, mockRepo)
+	service := userservice.NewUserService(mockTx, mockToken, mockRepo, nil)
 
 	return mockToken, mockTx, mockRepo, service
 }
