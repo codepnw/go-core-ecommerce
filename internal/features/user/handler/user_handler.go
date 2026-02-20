@@ -1,7 +1,9 @@
 package userhandler
 
 import (
+	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/codepnw/go-starter-kit/internal/auth"
 	"github.com/codepnw/go-starter-kit/internal/errs"
@@ -94,14 +96,20 @@ func (h *UserHandler) RefreshToken(c *gin.Context) {
 }
 
 func (h *UserHandler) Logout(c *gin.Context) {
-	req := new(RefreshTokenReq)
-
-	if err := c.ShouldBindJSON(req); err != nil {
-		response.ResponseError(c, http.StatusBadRequest, err)
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		response.ResponseError(c, http.StatusUnauthorized, errors.New("header is missing"))
+		return
+	}
+	
+	args := strings.Fields(authHeader)
+	if len(args) != 2 || args[0] != "Bearer" {
+		response.ResponseError(c, http.StatusUnauthorized, errors.New("invalid token format"))
+		c.Abort()
 		return
 	}
 
-	if err := h.service.Logout(c.Request.Context(), req.RefreshToken); err != nil {
+	if err := h.service.Logout(c.Request.Context(), args[1]); err != nil {
 		switch err {
 		case errs.ErrTokenNotFound:
 			response.ResponseError(c, http.StatusNotFound, err)
@@ -120,7 +128,7 @@ func (h *UserHandler) GetProfile(c *gin.Context) {
 		response.ResponseError(c, http.StatusUnauthorized, err)
 		return
 	}
-	
+
 	resp, err := h.service.GetProfile(c.Request.Context(), userID)
 	if err != nil {
 		switch err {

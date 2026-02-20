@@ -8,6 +8,7 @@ import (
 	context "context"
 	sql "database/sql"
 	reflect "reflect"
+	time "time"
 
 	user "github.com/codepnw/go-starter-kit/internal/features/user"
 	gomock "github.com/golang/mock/gomock"
@@ -34,6 +35,20 @@ func NewMockUserRepository(ctrl *gomock.Controller) *MockUserRepository {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockUserRepository) EXPECT() *MockUserRepositoryMockRecorder {
 	return m.recorder
+}
+
+// BlacklistToken mocks base method.
+func (m *MockUserRepository) BlacklistToken(ctx context.Context, token string, ttl time.Duration) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BlacklistToken", ctx, token, ttl)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// BlacklistToken indicates an expected call of BlacklistToken.
+func (mr *MockUserRepositoryMockRecorder) BlacklistToken(ctx, token, ttl interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BlacklistToken", reflect.TypeOf((*MockUserRepository)(nil).BlacklistToken), ctx, token, ttl)
 }
 
 // CheckEmailExists mocks base method.
@@ -107,6 +122,21 @@ func (m *MockUserRepository) InsertUserTx(ctx context.Context, tx *sql.Tx, u *us
 func (mr *MockUserRepositoryMockRecorder) InsertUserTx(ctx, tx, u interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertUserTx", reflect.TypeOf((*MockUserRepository)(nil).InsertUserTx), ctx, tx, u)
+}
+
+// IsTokenBlacklisted mocks base method.
+func (m *MockUserRepository) IsTokenBlacklisted(ctx context.Context, token string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsTokenBlacklisted", ctx, token)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// IsTokenBlacklisted indicates an expected call of IsTokenBlacklisted.
+func (mr *MockUserRepositoryMockRecorder) IsTokenBlacklisted(ctx, token interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsTokenBlacklisted", reflect.TypeOf((*MockUserRepository)(nil).IsTokenBlacklisted), ctx, token)
 }
 
 // RevokedRefreshTokenTx mocks base method.

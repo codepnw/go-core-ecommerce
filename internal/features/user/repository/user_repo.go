@@ -4,10 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/codepnw/go-starter-kit/internal/errs"
 	"github.com/codepnw/go-starter-kit/internal/features/user"
+	"github.com/redis/go-redis/v9"
 )
 
 //go:generate mockgen -source=user_repo.go -destination=user_repo_mock.go -package=userrepository
@@ -21,14 +23,21 @@ type UserRepository interface {
 	InsertUserTx(ctx context.Context, tx *sql.Tx, u *user.User) error
 	InsertRefreshTokenTx(ctx context.Context, tx *sql.Tx, token *user.RefreshToken) error
 	RevokedRefreshTokenTx(ctx context.Context, tx *sql.Tx, token string) error
+
+	// Redis
+	BlacklistToken(ctx context.Context, token string, ttl time.Duration) error
 }
 
 type userRepository struct {
-	db *sql.DB
+	db    *sql.DB
+	redis *redis.Client
 }
 
-func NewUserRepository(db *sql.DB) UserRepository {
-	return &userRepository{db: db}
+func NewUserRepository(db *sql.DB, redis *redis.Client) UserRepository {
+	return &userRepository{
+		db:    db,
+		redis: redis,
+	}
 }
 
 func (r *userRepository) InsertUserTx(ctx context.Context, tx *sql.Tx, u *user.User) error {
@@ -159,4 +168,11 @@ func (r *userRepository) RevokedRefreshTokenTx(ctx context.Context, tx *sql.Tx, 
 		return errs.ErrTokenNotFound
 	}
 	return nil
+}
+
+// ------------ REDIS -------------------
+
+func (r *userRepository) BlacklistToken(ctx context.Context, token string, ttl time.Duration) error {
+	key := fmt.Sprintf("blacklist:%s", token)
+	return r.redis.Set(ctx, key, "revoked", ttl).Err()
 }

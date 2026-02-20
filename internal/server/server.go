@@ -50,17 +50,17 @@ func NewServer(cfg *config.EnvConfig, db *sql.DB) (*Server, error) {
 		return nil, err
 	}
 
-	// Middleware
-	mid := middleware.InitMiddleware(token)
-
-	// DB Transaction
-	tx := database.NewDBTransaction(db)
-	
 	// Init Redis
 	redis, err := database.InitRedis(cfg)
 	if err != nil {
 		return nil, err
 	}
+
+	// Middleware
+	mid := middleware.InitMiddleware(token, redis)
+
+	// DB Transaction
+	tx := database.NewDBTransaction(db)
 
 	// Denpendency Injection
 	s := &Server{
@@ -110,7 +110,7 @@ func (s *Server) ginMiddleware(r *gin.Engine) {
 
 func (s *Server) setupHandler() {
 	// User Handler Setup
-	userRepo := userrepository.NewUserRepository(s.db)
+	userRepo := userrepository.NewUserRepository(s.db, s.redis)
 	userService := userservice.NewUserService(s.tx, s.token, userRepo, s.redis)
 	s.handlerUser = userhandler.NewUserHandler(userService)
 

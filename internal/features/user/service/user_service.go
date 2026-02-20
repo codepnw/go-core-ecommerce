@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/codepnw/go-starter-kit/pkg/database"
 	jwttoken "github.com/codepnw/go-starter-kit/pkg/jwttoken"
 	"github.com/codepnw/go-starter-kit/pkg/utils/password"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -191,6 +193,11 @@ func (s *userService) Logout(ctx context.Context, token string) error {
 	ctx, cancel := context.WithTimeout(ctx, config.ContextTimeout)
 	defer cancel()
 
+	// Check Redis Token Blacklist
+	if err := s.verifyTokenBlacklist(ctx, token); err != nil {
+		return err
+	}
+
 	err := s.tx.WithTx(ctx, func(tx *sql.Tx) error {
 		if err := s.repo.RevokedRefreshTokenTx(ctx, tx, token); err != nil {
 			return err
@@ -223,7 +230,7 @@ func (s *userService) GetProfile(ctx context.Context, userID string) (*user.User
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Set Redis DB
 	if data, err := json.Marshal(userData); err == nil {
 		s.redisDB.Set(ctx, redisKey, data, config.RedisUserDuration)
@@ -259,6 +266,31 @@ func (s *userService) insertRefreshTokenInput(userID, token string) *user.Refres
 		ExpiresAt: time.Now().Add(config.RefreshTokenDuration),
 		Revoked:   false,
 	}
+}
+
+func (s *userService) verifyTokenBlacklist(ctx context.Context, tokenStr string) error {
+	token, _, err := new(jwt.Parser).ParseUnverified(tokenStr, &jwttoken.UserClaims{})
+	if err != nil {
+		return err
+	}
+
+	claims, ok := token.Claims.(*jwttoken.UserClaims)
+	if !ok {
+		return errors.New("invalid token claims")
+	}
+
+	if claims.ExpiresAt == nil {
+		return errors.New("exp not found in token")
+	}
+
+	ttl := time.Until(claims.ExpiresAt.Time)
+
+	// token expires return
+	if ttl <= 0 {
+		return nil
+	}
+
+	return s.repo.BlacklistToken(ctx, tokenStr, ttl)
 }
 
 func generateRedisKey(userID string) string {
