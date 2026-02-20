@@ -24,7 +24,7 @@ type UserService interface {
 	Register(ctx context.Context, u *user.User) (*UserTokenResponse, error)
 	Login(ctx context.Context, email, password string) (*UserTokenResponse, error)
 	RefreshToken(ctx context.Context, token string) (*UserTokenResponse, error)
-	Logout(ctx context.Context, token string) error
+	Logout(ctx context.Context, accessToken, refreshToken string) error
 	GetProfile(ctx context.Context, userID string) (*user.User, error)
 }
 
@@ -189,17 +189,17 @@ func (s *userService) RefreshToken(ctx context.Context, token string) (*UserToke
 	return response, nil
 }
 
-func (s *userService) Logout(ctx context.Context, token string) error {
+func (s *userService) Logout(ctx context.Context, accessToken, refreshToken string) error {
 	ctx, cancel := context.WithTimeout(ctx, config.ContextTimeout)
 	defer cancel()
 
 	// Check Redis Token Blacklist
-	if err := s.verifyTokenBlacklist(ctx, token); err != nil {
+	if err := s.verifyTokenBlacklist(ctx, accessToken); err != nil {
 		return err
 	}
 
 	err := s.tx.WithTx(ctx, func(tx *sql.Tx) error {
-		if err := s.repo.RevokedRefreshTokenTx(ctx, tx, token); err != nil {
+		if err := s.repo.RevokedRefreshTokenTx(ctx, tx, refreshToken); err != nil {
 			return err
 		}
 		return nil

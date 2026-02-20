@@ -96,20 +96,30 @@ func (h *UserHandler) RefreshToken(c *gin.Context) {
 }
 
 func (h *UserHandler) Logout(c *gin.Context) {
+	// Get Access Token From Header
 	authHeader := c.GetHeader("Authorization")
 	if authHeader == "" {
 		response.ResponseError(c, http.StatusUnauthorized, errors.New("header is missing"))
 		return
 	}
-	
+
 	args := strings.Fields(authHeader)
 	if len(args) != 2 || args[0] != "Bearer" {
 		response.ResponseError(c, http.StatusUnauthorized, errors.New("invalid token format"))
-		c.Abort()
 		return
 	}
+	accessToken := args[1]
 
-	if err := h.service.Logout(c.Request.Context(), args[1]); err != nil {
+	// Get Refresh Token
+	req := new(RefreshTokenReq)
+	if err := c.ShouldBindJSON(req); err != nil {
+		response.ResponseError(c, http.StatusBadRequest, err)
+		return
+	}
+	refreshToken := req.RefreshToken
+
+	// Logout Service
+	if err := h.service.Logout(c.Request.Context(), accessToken, refreshToken); err != nil {
 		switch err {
 		case errs.ErrTokenNotFound:
 			response.ResponseError(c, http.StatusNotFound, err)
