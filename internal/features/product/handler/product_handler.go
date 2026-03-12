@@ -48,6 +48,34 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 	response.ResponseSuccess(c, http.StatusCreated, input)
 }
 
+func (h *ProductHandler) CreateProductPromotion(c *gin.Context) {
+	req := new(ProductPromotionCreateReq)
+
+	if err := c.ShouldBindJSON(req); err != nil {
+		response.ResponseError(c, http.StatusBadRequest, err)
+		return
+	}
+
+	if err := h.service.CreateProductPromotion(c.Request.Context(), req.ProductID, req.Stock, req.DiscountPercent); err != nil {
+		switch err {
+		case errs.ErrStockNotEnough:
+			response.ResponseError(c, http.StatusBadRequest, err)
+		case errs.ErrProductSKUExists:
+			response.ResponseError(c, http.StatusBadRequest, err)
+		default:
+			response.ResponseError(c, http.StatusInternalServerError, err)
+		}
+		return
+	}
+
+	resp := map[string]any{
+		"product_id":       req.ProductID,
+		"stock":            req.Stock,
+		"discount_percent": req.DiscountPercent,
+	}
+	response.ResponseSuccess(c, http.StatusCreated, resp)
+}
+
 func (h *ProductHandler) GetProduct(c *gin.Context) {
 	productID, _ := strconv.Atoi(c.Param(ParamProductID))
 

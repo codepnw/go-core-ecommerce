@@ -52,13 +52,14 @@ func (s *Server) registerProductRoutes(r *gin.RouterGroup) {
 		public.GET(paramID, handler.GetProduct)
 	}
 
-	// Authorized Routes
-	authorized := r.Group("/products", s.mid.Authorized())
+	// Admin Routes
+	admin := r.Group("/products", s.mid.Authorized(), s.mid.AdminOnly())
 	{
-		authorized.POST("/", handler.CreateProduct)
-		authorized.PATCH(paramID, handler.UpdateProduct)
-		authorized.DELETE(paramID, handler.DeleteProduct)
-		authorized.POST(paramID+"/stock", handler.IncreaseStock)
+		admin.POST("/", handler.CreateProduct)
+		admin.POST("/promotion", handler.CreateProductPromotion)
+		admin.PATCH(paramID, handler.UpdateProduct)
+		admin.DELETE(paramID, handler.DeleteProduct)
+		admin.POST(paramID+"/stock", handler.IncreaseStock)
 	}
 }
 

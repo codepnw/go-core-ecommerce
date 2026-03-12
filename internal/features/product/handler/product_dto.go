@@ -9,6 +9,12 @@ type ProductCreateReq struct {
 	SKU   string `json:"sku" binding:"required,min=3"`
 }
 
+type ProductPromotionCreateReq struct {
+	ProductID       int64 `json:"product_id" binding:"required"`
+	Stock           int   `json:"stock" binding:"required,gt=0"`
+	DiscountPercent int   `json:"discount_percent" binding:"required,gt=0"`
+}
+
 type ProductUpdateReq struct {
 	Name  *string `json:"name" binding:"omitempty,min=3"`
 	Price *int    `json:"price" binding:"omitempty,gt=0"`
