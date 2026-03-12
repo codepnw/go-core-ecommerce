@@ -124,21 +124,6 @@ func (mr *MockUserRepositoryMockRecorder) InsertUserTx(ctx, tx, u interface{}) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertUserTx", reflect.TypeOf((*MockUserRepository)(nil).InsertUserTx), ctx, tx, u)
 }
 
-// IsTokenBlacklisted mocks base method.
-func (m *MockUserRepository) IsTokenBlacklisted(ctx context.Context, token string) (bool, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IsTokenBlacklisted", ctx, token)
-	ret0, _ := ret[0].(bool)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// IsTokenBlacklisted indicates an expected call of IsTokenBlacklisted.
-func (mr *MockUserRepositoryMockRecorder) IsTokenBlacklisted(ctx, token interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsTokenBlacklisted", reflect.TypeOf((*MockUserRepository)(nil).IsTokenBlacklisted), ctx, token)
-}
-
 // RevokedRefreshTokenTx mocks base method.
 func (m *MockUserRepository) RevokedRefreshTokenTx(ctx context.Context, tx *sql.Tx, token string) error {
 	m.ctrl.T.Helper()

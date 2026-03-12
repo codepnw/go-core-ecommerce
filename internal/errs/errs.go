@@ -25,4 +25,5 @@ var (
 	ErrCartEmpty               = errors.New("cart empty")
 	ErrOrderNotFound           = errors.New("order not found")
 	ErrInvalidStatusTransition = errors.New("invalid status transition")
+	ErrOrderNotOwner           = errors.New("order not owner")
 )

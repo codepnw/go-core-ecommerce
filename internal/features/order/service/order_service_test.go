@@ -30,7 +30,7 @@ func TestCreateOrder(t *testing.T) {
 	type testCase struct {
 		name        string
 		input       createOrderInput
-		mockFn      func(mockTx *database.MockTxManager, mockOrder *orderrepository.MockOrderRepository, mockProd *productrepository.MockProductRepository, mockCart *cartrepository.MockCartRepository, input createOrderInput)
+		mockFn      func(mockTx *database.MockTxManager, mockOrder *orderrepository.MockOrderRepository, mockProd *productrepository.MockProductRepository, mockRedis *productrepository.MockProductRedisRepository, mockCart *cartrepository.MockCartRepository, input createOrderInput)
 		expectedErr error
 	}
 
@@ -38,12 +38,18 @@ func TestCreateOrder(t *testing.T) {
 		{
 			name:  "success",
 			input: createOrderInput{userID: "mock-uuid-1", address: "Bangkok, Thailand"},
-			mockFn: func(mockTx *database.MockTxManager, mockOrder *orderrepository.MockOrderRepository, mockProd *productrepository.MockProductRepository, mockCart *cartrepository.MockCartRepository, input createOrderInput) {
+			mockFn: func(mockTx *database.MockTxManager, mockOrder *orderrepository.MockOrderRepository, mockProd *productrepository.MockProductRepository, mockRedis *productrepository.MockProductRedisRepository, mockCart *cartrepository.MockCartRepository, input createOrderInput) {
 				mockItems := []*cart.CartItemResult{
-					{ID: 1, ProductID: 101, Quantity: 2, ProductName: "IPhone-17", Price: 44900, Stock: 10},
-					{ID: 2, ProductID: 102, Quantity: 1, ProductName: "Macbook-air-M4", Price: 34900, Stock: 5},
+					{ID: 1, ProductID: int64(101), Quantity: 2, ProductName: "IPhone-17", Price: 44900, Stock: 10},
+					{ID: 2, ProductID: int64(102), Quantity: 1, ProductName: "Macbook-air-M4", Price: 34900, Stock: 5},
 				}
 				mockCart.EXPECT().GetCartItems(gomock.Any(), input.userID).Return(mockItems, nil).Times(1)
+				
+				for _, item := range mockItems {
+					mockRedis.EXPECT().CheckStockExists(gomock.Any(), item.ProductID).Return(true, nil).Times(1)
+					
+					mockRedis.EXPECT().DecreaseStock(gomock.Any(), item.ProductID, item.Quantity).Return(int64(1), nil).Times(1)
+				}
 
 				mockTx.EXPECT().WithTx(gomock.Any(), gomock.Any()).DoAndReturn(
 					func(ctx context.Context, fn func(tx *sql.Tx) error) error {
@@ -66,7 +72,7 @@ func TestCreateOrder(t *testing.T) {
 		{
 			name:  "fail cart empty",
 			input: createOrderInput{userID: "mock-uuid-1", address: "Bangkok, Thailand"},
-			mockFn: func(mockTx *database.MockTxManager, mockOrder *orderrepository.MockOrderRepository, mockProd *productrepository.MockProductRepository, mockCart *cartrepository.MockCartRepository, input createOrderInput) {
+			mockFn: func(mockTx *database.MockTxManager, mockOrder *orderrepository.MockOrderRepository, mockProd *productrepository.MockProductRepository, mockRedis *productrepository.MockProductRedisRepository, mockCart *cartrepository.MockCartRepository, input createOrderInput) {
 				mockItems := []*cart.CartItemResult{}
 				mockCart.EXPECT().GetCartItems(gomock.Any(), input.userID).Return(mockItems, nil).Times(1)
 			},
@@ -75,11 +81,11 @@ func TestCreateOrder(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		service, mockTx, mockOrd, mockProd, mockCart := setup(t)
+		deps := setup(t)
 
-		tc.mockFn(mockTx, mockOrd, mockProd, mockCart, tc.input)
+		tc.mockFn(deps.MockTx, deps.MockOrd, deps.MockProd, deps.MockProdRedis, deps.MockCart, tc.input)
 
-		orderNo, err := service.CreateOrder(context.Background(), tc.input.userID, tc.input.address)
+		orderNo, err := deps.Serivce.CreateOrder(context.Background(), tc.input.userID, tc.input.address)
 
 		if tc.expectedErr != nil {
 			assert.Error(t, err)
@@ -124,11 +130,11 @@ func TestGetOrderDetails(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		service, _, mockOrd, mockProd, mockCart := setup(t)
+		deps := setup(t)
 
-		tc.mockFn(mockOrd, mockProd, mockCart, tc.orderID)
+		tc.mockFn(deps.MockOrd, deps.MockProd, deps.MockCart, tc.orderID)
 
-		resp, err := service.GetOrderDetails(context.Background(), tc.orderID)
+		resp, err := deps.Serivce.GetOrderDetails(context.Background(), tc.orderID)
 
 		if tc.expectedErr != nil {
 			assert.Error(t, err)
@@ -171,11 +177,11 @@ func TestMyOrders(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		service, _, mockOrd, _, _ := setup(t)
+		deps := setup(t)
 
-		tc.mockFn(mockOrd, tc.userID)
+		tc.mockFn(deps.MockOrd, tc.userID)
 
-		resp, err := service.MyOrders(context.Background(), "mock-uuid-01", 0, 0)
+		resp, err := deps.Serivce.MyOrders(context.Background(), "mock-uuid-01", 0, 0)
 
 		if tc.expectedErr != nil {
 			assert.Error(t, err)
@@ -203,13 +209,13 @@ func TestUpdateStatus(t *testing.T) {
 			mockFn: func(mockTx *database.MockTxManager, mockOrder *orderrepository.MockOrderRepository, orderID int64, newStatus order.OrderStatus) {
 				mockData := &order.Order{Status: "PENDING"}
 				mockOrder.EXPECT().FindOrderDetails(gomock.Any(), orderID).Return(mockData, nil).Times(1)
-				
+
 				mockTx.EXPECT().WithTx(gomock.Any(), gomock.Any()).DoAndReturn(
 					func(ctx context.Context, fn func(tx *sql.Tx) error) error {
 						return fn(nil)
 					},
 				)
-				
+
 				mockOrder.EXPECT().UpdateStatusTx(gomock.Any(), gomock.Any(), orderID, newStatus).Return(nil).Times(1)
 			},
 			expectedErr: nil,
@@ -231,13 +237,13 @@ func TestUpdateStatus(t *testing.T) {
 			mockFn: func(mockTx *database.MockTxManager, mockOrder *orderrepository.MockOrderRepository, orderID int64, newStatus order.OrderStatus) {
 				mockData := &order.Order{Status: "PENDING"}
 				mockOrder.EXPECT().FindOrderDetails(gomock.Any(), orderID).Return(mockData, nil).Times(1)
-				
+
 				mockTx.EXPECT().WithTx(gomock.Any(), gomock.Any()).DoAndReturn(
 					func(ctx context.Context, fn func(tx *sql.Tx) error) error {
 						return fn(nil)
 					},
 				)
-				
+
 				mockOrder.EXPECT().UpdateStatusTx(gomock.Any(), gomock.Any(), orderID, newStatus).Return(ErrDB).Times(1)
 			},
 			expectedErr: ErrDB,
@@ -245,11 +251,11 @@ func TestUpdateStatus(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		service, mockTx, mockOrd, _, _ := setup(t)
+		deps := setup(t)
 
-		tc.mockFn(mockTx, mockOrd, tc.orderID, tc.newStatus)
+		tc.mockFn(deps.MockTx, deps.MockOrd, tc.orderID, tc.newStatus)
 
-		err := service.UpdateStatus(context.Background(), tc.orderID, tc.newStatus)
+		err := deps.Serivce.UpdateStatus(context.Background(), tc.orderID, tc.newStatus)
 
 		if tc.expectedErr != nil {
 			assert.Error(t, err)
@@ -259,16 +265,39 @@ func TestUpdateStatus(t *testing.T) {
 	}
 }
 
-func setup(t *testing.T) (orderservice.OrderService, *database.MockTxManager, *orderrepository.MockOrderRepository, *productrepository.MockProductRepository, *cartrepository.MockCartRepository) {
+type setupDeps struct {
+	Serivce       orderservice.OrderService
+	MockTx        *database.MockTxManager
+	MockOrd       *orderrepository.MockOrderRepository
+	MockProd      *productrepository.MockProductRepository
+	MockProdRedis *productrepository.MockProductRedisRepository
+	MockCart      *cartrepository.MockCartRepository
+}
+
+func setup(t *testing.T) *setupDeps {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockTx := database.NewMockTxManager(ctrl)
 	mockOrd := orderrepository.NewMockOrderRepository(ctrl)
 	mockProd := productrepository.NewMockProductRepository(ctrl)
+	mockProdRedis := productrepository.NewMockProductRedisRepository(ctrl)
 	mockCart := cartrepository.NewMockCartRepository(ctrl)
 
-	service := orderservice.NewOrderService(mockTx, mockOrd, mockProd, mockCart)
+	service := orderservice.NewOrderService(&orderservice.OrderServiceDeps{
+		Tx:        mockTx,
+		OrderRepo: mockOrd,
+		ProdRepo:  mockProd,
+		ProdRedis: mockProdRedis,
+		CartRepo:  mockCart,
+	})
 
-	return service, mockTx, mockOrd, mockProd, mockCart
+	return &setupDeps{
+		Serivce:       service,
+		MockTx:        mockTx,
+		MockOrd:       mockOrd,
+		MockProd:      mockProd,
+		MockProdRedis: mockProdRedis,
+		MockCart:      mockCart,
+	}
 }

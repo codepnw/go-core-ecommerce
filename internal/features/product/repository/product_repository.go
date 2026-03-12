@@ -8,11 +8,12 @@ import (
 
 	"github.com/codepnw/go-starter-kit/internal/errs"
 	"github.com/codepnw/go-starter-kit/internal/features/product"
+	"github.com/codepnw/go-starter-kit/pkg/database"
 )
 
 //go:generate mockgen -source=product_repository.go -destination=product_repository_mock.go -package=productrepository
 type ProductRepository interface {
-	InsertProduct(ctx context.Context, input *product.Product) error
+	InsertProduct(ctx context.Context, db database.DBTX, input *product.Product) error
 	FindProduct(ctx context.Context, productID int64) (*product.Product, error)
 	ListProducts(ctx context.Context, limit, offset int) ([]*product.Product, error)
 	UpdateProduct(ctx context.Context, input *product.Product) error
@@ -32,7 +33,7 @@ func NewProductRepository(db *sql.DB) ProductRepository {
 	return &productRepository{db: db}
 }
 
-func (r *productRepository) InsertProduct(ctx context.Context, input *product.Product) error {
+func (r *productRepository) InsertProduct(ctx context.Context, db database.DBTX, input *product.Product) error {
 	query := `
 		INSERT INTO products (name, price, stock, sku, version)
 		VALUES ($1, $2, $3, $4, 1) RETURNING id, version

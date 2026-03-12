@@ -17,9 +17,6 @@ The system focuses heavily on the transactional checkout phase and is built arou
 2. **Order:** Records the overall purchase transaction, including the buyer's information, total price, and current fulfillment status.
 3. **Order Item:** Captures a historical snapshot of the exact price and quantity of a product at the moment the order was placed (preventing past orders from changing if product prices update in the future).
 
-=======================================
-
-
 ## 🏗️ Project Structure & Initialization
 
 > **💡 Note on Commit History:** This repository was initialized using a standard **[Go Starter Kit](https://github.com/codepnw/go-starter-kit)** to handle repetitive boilerplate code (e.g., basic folder structure, router setup). This strategic choice allowed the development focus to remain entirely on building the complex core business logic, database transactions, and concurrency handling that you will see in the subsequent commits.
@@ -48,7 +45,6 @@ The project directory follows a modular Go layout, combining **Clean Architectur
 ├── Dockerfile              # Docker build instructions for production deployment
 └── Makefile                # Shortcut commands for build, test, migrate, and run
 ```
-
 
 ## 🚀 Getting Started
 

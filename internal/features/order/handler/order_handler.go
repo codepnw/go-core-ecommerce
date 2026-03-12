@@ -39,6 +39,8 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 		switch err {
 		case errs.ErrCartEmpty:
 			response.ResponseError(c, http.StatusBadRequest, err)
+		case errs.ErrStockNotEnough:
+			response.ResponseError(c, http.StatusBadRequest, err)
 		default:
 			response.ResponseError(c, http.StatusInternalServerError, err)
 		}

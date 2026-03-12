@@ -5,10 +5,12 @@ import (
 	"database/sql"
 	"fmt"
 	"math"
+	"sort"
 	"time"
 
 	"github.com/codepnw/go-starter-kit/internal/config"
 	"github.com/codepnw/go-starter-kit/internal/errs"
+	"github.com/codepnw/go-starter-kit/internal/features/cart"
 	cartrepository "github.com/codepnw/go-starter-kit/internal/features/cart/repository"
 	"github.com/codepnw/go-starter-kit/internal/features/order"
 	orderrepository "github.com/codepnw/go-starter-kit/internal/features/order/repository"
@@ -27,20 +29,25 @@ type orderService struct {
 	tx        database.TxManager
 	orderRepo orderrepository.OrderRepository
 	prodRepo  productrepository.ProductRepository
+	prodRedis productrepository.ProductRedisRepository
 	cartRepo  cartrepository.CartRepository
 }
 
-func NewOrderService(
-	tx database.TxManager,
-	orderRepo orderrepository.OrderRepository,
-	prodRepo productrepository.ProductRepository,
-	cartRepo cartrepository.CartRepository,
-) OrderService {
+type OrderServiceDeps struct {
+	Tx        database.TxManager
+	OrderRepo orderrepository.OrderRepository
+	ProdRepo  productrepository.ProductRepository
+	ProdRedis productrepository.ProductRedisRepository
+	CartRepo  cartrepository.CartRepository
+}
+
+func NewOrderService(deps *OrderServiceDeps) OrderService {
 	return &orderService{
-		tx:        tx,
-		orderRepo: orderRepo,
-		prodRepo:  prodRepo,
-		cartRepo:  cartRepo,
+		tx:        deps.Tx,
+		orderRepo: deps.OrderRepo,
+		prodRepo:  deps.ProdRepo,
+		prodRedis: deps.ProdRedis,
+		cartRepo:  deps.CartRepo,
 	}
 }
 
@@ -82,7 +89,7 @@ func (s *orderService) CreateOrder(ctx context.Context, userID, address string) 
 	ctx, cancel := context.WithTimeout(ctx, config.ContextTimeout)
 	defer cancel()
 
-	// 1. Find Cart Items
+	// Get Cart Items
 	cartItems, err := s.cartRepo.GetCartItems(ctx, userID)
 	if err != nil {
 		return "", fmt.Errorf("get cart items failed: %w", err)
@@ -96,12 +103,38 @@ func (s *orderService) CreateOrder(ctx context.Context, userID, address string) 
 		totalAmount += int64(item.Price) * int64(item.Quantity)
 	}
 
+	// ============================
+	// Redis Gatekeeper (Fast-Fail)
+	decreasedItems := make([]*cart.CartItemResult, 0, len(cartItems))
+	for _, item := range cartItems {
+		// Check Product Promotion
+		isPromo, _ := s.prodRedis.CheckStockExists(ctx, item.ProductID)
+		
+		if isPromo {
+			// Redis Decrease Product Stock
+			_, err := s.prodRedis.DecreaseStock(ctx, item.ProductID, item.Quantity)
+			if err != nil {
+				// Rollback: Redis Increase Product Stock
+				for _, dItem := range decreasedItems {
+					_ = s.prodRedis.IncreaseStock(ctx, dItem.ProductID, dItem.Quantity)
+				}
+				return "", errs.ErrStockNotEnough
+			}
+			decreasedItems = append(decreasedItems, item)
+		}
+	}
+
+	// Sort ID protect Deadlock!
+	sort.Slice(cartItems, func(i, j int) bool {
+		return cartItems[i].ProductID < cartItems[j].ProductID
+	})
+
 	var orderID int64
 	var orderCreatedAt time.Time
 
 	// Transaction
 	err = s.tx.WithTx(ctx, func(tx *sql.Tx) error {
-		// 2. Create Order
+		// Create Order
 		id, createdAt, err := s.orderRepo.InsertOrderTx(ctx, tx, userID, totalAmount, address)
 		if err != nil {
 			return fmt.Errorf("insert order failed: %w", err)
@@ -109,14 +142,13 @@ func (s *orderService) CreateOrder(ctx context.Context, userID, address string) 
 		orderID = id
 		orderCreatedAt = createdAt
 
-		// 3. Loop Items
 		for _, item := range cartItems {
-			// 3.1 Product Decrease Stock
+			// Decrease Product Stock
 			if err := s.prodRepo.DecreaseStockTx(ctx, tx, item.ProductID, item.Quantity); err != nil {
 				return fmt.Errorf("product %s out of stock: %w", item.ProductName, err)
 			}
 
-			// 3.2 Create Order Items
+			// Create Order Items
 			err := s.orderRepo.InsertOrderItemTx(ctx, tx, order.OrderItemReq{
 				OrderID:   orderID,
 				ProductID: item.ProductID,
@@ -128,14 +160,17 @@ func (s *orderService) CreateOrder(ctx context.Context, userID, address string) 
 			}
 		}
 
-		// 4. Clear Cart
+		// Clear Cart
 		if err := s.cartRepo.ClearCartTx(ctx, tx, userID); err != nil {
 			return fmt.Errorf("clear cart failed: %w", err)
 		}
-
 		return nil // Commit Transaction
 	})
 	if err != nil {
+		// Transaction Failed: Rollback Redis Product Stock
+		for _, item := range cartItems {
+			_ = s.prodRedis.IncreaseStock(ctx, item.ProductID, item.Quantity)
+		}
 		return "", err
 	}
 
@@ -190,19 +225,19 @@ func (s *orderService) MyOrders(ctx context.Context, userID string, page, limit 
 func (s *orderService) UpdateStatus(ctx context.Context, orderID int64, newStatus order.OrderStatus) error {
 	ctx, cancel := context.WithTimeout(ctx, config.ContextTimeout)
 	defer cancel()
-	
+
 	// Order Details
 	orderData, err := s.orderRepo.FindOrderDetails(ctx, orderID)
 	if err != nil {
 		return err
 	}
 	currentStatus := orderData.Status
-	
+
 	// Check Status Transition
 	if !isValidStatus(currentStatus, newStatus) {
 		return errs.ErrInvalidStatusTransition
 	}
-	
+
 	// Cancel Order Method
 	if newStatus == order.StatusCancelled {
 		return s.cancelOrder(ctx, orderID)
@@ -220,11 +255,14 @@ func (s *orderService) UpdateStatus(ctx context.Context, orderID int64, newStatu
 // -------- Private Method ------------
 
 func (s *orderService) cancelOrder(ctx context.Context, orderID int64) error {
-	return s.tx.WithTx(ctx, func(tx *sql.Tx) error {
+	var orderItems []*order.OrderItem
+
+	err := s.tx.WithTx(ctx, func(tx *sql.Tx) error {
 		items, err := s.orderRepo.FindOrderItemsTx(ctx, tx, orderID)
 		if err != nil {
 			return err
 		}
+		orderItems = items
 
 		for _, item := range items {
 			if err := s.prodRepo.IncreaseStockTx(ctx, tx, item.ProductID, item.Quantity); err != nil {
@@ -237,6 +275,15 @@ func (s *orderService) cancelOrder(ctx context.Context, orderID int64) error {
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	// Transaction Success: Redis Rollback Product Stock
+	for _, item := range orderItems {
+		_ = s.prodRedis.IncreaseStock(ctx, item.ProductID, item.Quantity)
+	}
+	return nil
 }
 
 // -------- HELPER Function ------------
