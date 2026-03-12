@@ -35,6 +35,21 @@ func (m *MockProductRedisRepository) EXPECT() *MockProductRedisRepositoryMockRec
 	return m.recorder
 }
 
+// CheckStockExists mocks base method.
+func (m *MockProductRedisRepository) CheckStockExists(ctx context.Context, productID int64) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CheckStockExists", ctx, productID)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CheckStockExists indicates an expected call of CheckStockExists.
+func (mr *MockProductRedisRepositoryMockRecorder) CheckStockExists(ctx, productID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CheckStockExists", reflect.TypeOf((*MockProductRedisRepository)(nil).CheckStockExists), ctx, productID)
+}
+
 // DecreaseStock mocks base method.
 func (m *MockProductRedisRepository) DecreaseStock(ctx context.Context, productID int64, qty int) (int64, error) {
 	m.ctrl.T.Helper()

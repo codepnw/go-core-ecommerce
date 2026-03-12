@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/codepnw/go-starter-kit/internal/errs"
 	"github.com/codepnw/go-starter-kit/internal/helper"
 	"github.com/redis/go-redis/v9"
 )
@@ -18,8 +19,9 @@ type ProductRedisRepository interface {
 
 	GetJSONCache(ctx context.Context, key string, data any) error
 	SetJSONCache(ctx context.Context, key string, data any, exp time.Duration) error
-	
+
 	DeleteCache(ctx context.Context, key string) error
+	CheckStockExists(ctx context.Context, productID int64) (bool, error)
 }
 
 type productRedisRepository struct {
@@ -61,6 +63,11 @@ func (r *productRedisRepository) DecreaseStock(ctx context.Context, productID in
 	if err != nil {
 		return 0, fmt.Errorf("redis decrease stock failed: %w", err)
 	}
+
+	if remainStock < 0 {
+		_ = r.client.IncrBy(ctx, key, int64(qty))
+		return 0, errs.ErrStockNotEnough
+	}
 	return remainStock, nil
 }
 
@@ -88,4 +95,14 @@ func (r *productRedisRepository) SetJSONCache(ctx context.Context, key string, d
 
 func (r *productRedisRepository) DeleteCache(ctx context.Context, key string) error {
 	return r.client.Del(ctx, key).Err()
+}
+
+func (r *productRedisRepository) CheckStockExists(ctx context.Context, productID int64) (bool, error) {
+	key := helper.RedisProductStockKey(productID)
+
+	count, err := r.client.Exists(ctx, key).Result()
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
