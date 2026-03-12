@@ -116,7 +116,13 @@ func (s *Server) setupHandler() {
 
 	// Product Handler Setup
 	prodRepo := productrepository.NewProductRepository(s.db)
-	prodService := productservice.NewProductService(prodRepo, s.redis)
+	prodRedis := productrepository.NewProductRedisRepository(s.redis)
+	prodService := productservice.NewProductService(&productservice.ProductServiceDeps{
+		DB:        s.db,
+		Tx:        s.tx,
+		ProdRepo:  prodRepo,
+		ProdRedis: prodRedis,
+	})
 	s.handlerProduct = producthandler.NewProductHandler(prodService)
 
 	// Cart Handler Setup
@@ -126,6 +132,12 @@ func (s *Server) setupHandler() {
 
 	// Order Handler Setup
 	ordRepo := orderrepository.NewOrderRepository(s.db)
-	ordService := orderservice.NewOrderService(s.tx, ordRepo, prodRepo, cartRepo)
+	ordService := orderservice.NewOrderService(&orderservice.OrderServiceDeps{
+		Tx:        s.tx,
+		OrderRepo: ordRepo,
+		ProdRepo:  prodRepo,
+		ProdRedis: prodRedis,
+		CartRepo:  cartRepo,
+	})
 	s.handlerOrder = orderhandler.NewOrderHandler(ordService)
 }

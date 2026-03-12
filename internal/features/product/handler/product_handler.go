@@ -66,10 +66,10 @@ func (h *ProductHandler) GetProduct(c *gin.Context) {
 }
 
 func (h *ProductHandler) GetProducts(c *gin.Context) {
+	page, _ := strconv.Atoi(c.Query("page"))
 	limit, _ := strconv.Atoi(c.Query("limit"))
-	offset, _ := strconv.Atoi(c.Query("offset"))
 
-	resp, err := h.service.GetProducts(c.Request.Context(), limit, offset)
+	resp, err := h.service.GetProducts(c.Request.Context(), page, limit)
 	if err != nil {
 		response.ResponseError(c, http.StatusInternalServerError, err)
 		return

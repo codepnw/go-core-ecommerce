@@ -49,6 +49,20 @@ func (mr *MockProductServiceMockRecorder) CreateProduct(ctx, input interface{}) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateProduct", reflect.TypeOf((*MockProductService)(nil).CreateProduct), ctx, input)
 }
 
+// CreateProductPromotion mocks base method.
+func (m *MockProductService) CreateProductPromotion(ctx context.Context, productID int64, stock, discountPercent int) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateProductPromotion", ctx, productID, stock, discountPercent)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateProductPromotion indicates an expected call of CreateProductPromotion.
+func (mr *MockProductServiceMockRecorder) CreateProductPromotion(ctx, productID, stock, discountPercent interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateProductPromotion", reflect.TypeOf((*MockProductService)(nil).CreateProductPromotion), ctx, productID, stock, discountPercent)
+}
+
 // DeleteProduct mocks base method.
 func (m *MockProductService) DeleteProduct(ctx context.Context, productID int64) error {
 	m.ctrl.T.Helper()

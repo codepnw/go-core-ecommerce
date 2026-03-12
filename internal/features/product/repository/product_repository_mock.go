@@ -10,6 +10,7 @@ import (
 	reflect "reflect"
 
 	product "github.com/codepnw/go-starter-kit/internal/features/product"
+	database "github.com/codepnw/go-starter-kit/pkg/database"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -108,17 +109,17 @@ func (mr *MockProductRepositoryMockRecorder) IncreaseStockTx(ctx, tx, productID,
 }
 
 // InsertProduct mocks base method.
-func (m *MockProductRepository) InsertProduct(ctx context.Context, input *product.Product) error {
+func (m *MockProductRepository) InsertProduct(ctx context.Context, db database.DBTX, input *product.Product) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "InsertProduct", ctx, input)
+	ret := m.ctrl.Call(m, "InsertProduct", ctx, db, input)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // InsertProduct indicates an expected call of InsertProduct.
-func (mr *MockProductRepositoryMockRecorder) InsertProduct(ctx, input interface{}) *gomock.Call {
+func (mr *MockProductRepositoryMockRecorder) InsertProduct(ctx, db, input interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertProduct", reflect.TypeOf((*MockProductRepository)(nil).InsertProduct), ctx, input)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertProduct", reflect.TypeOf((*MockProductRepository)(nil).InsertProduct), ctx, db, input)
 }
 
 // ListProducts mocks base method.
