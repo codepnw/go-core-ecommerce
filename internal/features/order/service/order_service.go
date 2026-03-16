@@ -85,7 +85,7 @@ func (s *orderService) GetOrderDetails(ctx context.Context, orderID int64) (*ord
 }
 
 // CreateOrder implements OrderService.
-func (s *orderService) CreateOrder(ctx context.Context, userID, address string) (string, error) {
+func (s *orderService) CreateOrder(ctx context.Context, userID, address string) (orderNo string, err error) {
 	ctx, cancel := context.WithTimeout(ctx, config.ContextTimeout)
 	defer cancel()
 
@@ -104,27 +104,37 @@ func (s *orderService) CreateOrder(ctx context.Context, userID, address string) 
 	}
 
 	// ============================
-	// Redis Gatekeeper (Fast-Fail)
+	// Redis: Gatekeeper (Fast-Fail)
 	decreasedItems := make([]*cart.CartItemResult, 0, len(cartItems))
+	
+	// Redis: if error Rollback Product Stock
+	defer func() {
+		if err != nil && len(decreasedItems) > 0 {
+			rbCtx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+			defer cancel()
+
+			for _, item := range decreasedItems {
+				_ = s.prodRedis.IncreaseStock(rbCtx, item.ProductID, item.Quantity)
+			}
+		}
+	}()
+	
+	// Redis: Check and Decrease Stock
 	for _, item := range cartItems {
 		// Check Product Promotion
 		isPromo, _ := s.prodRedis.CheckStockExists(ctx, item.ProductID)
-		
+
 		if isPromo {
 			// Redis Decrease Product Stock
-			_, err := s.prodRedis.DecreaseStock(ctx, item.ProductID, item.Quantity)
-			if err != nil {
-				// Rollback: Redis Increase Product Stock
-				for _, dItem := range decreasedItems {
-					_ = s.prodRedis.IncreaseStock(ctx, dItem.ProductID, dItem.Quantity)
-				}
+			_, redisErr := s.prodRedis.DecreaseStock(ctx, item.ProductID, item.Quantity)
+			if redisErr != nil {
 				return "", errs.ErrStockNotEnough
 			}
 			decreasedItems = append(decreasedItems, item)
 		}
 	}
 
-	// Sort ID protect Deadlock!
+	// Sort ID Prevent Deadlock!
 	sort.Slice(cartItems, func(i, j int) bool {
 		return cartItems[i].ProductID < cartItems[j].ProductID
 	})
@@ -167,10 +177,6 @@ func (s *orderService) CreateOrder(ctx context.Context, userID, address string) 
 		return nil // Commit Transaction
 	})
 	if err != nil {
-		// Transaction Failed: Rollback Redis Product Stock
-		for _, item := range cartItems {
-			_ = s.prodRedis.IncreaseStock(ctx, item.ProductID, item.Quantity)
-		}
 		return "", err
 	}
 
